@@ -1,17 +1,60 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/constants/app_constants.dart';
-import '../../controllers/gesture_controller.dart';
 import '../../data/models/exam_session.dart';
 import '../../data/models/tool.dart';
 import '../../data/models/exam_progress.dart';
 import '../../navigation/app_router.dart';
-import '../presenters/exam_presenter.dart';
 import '../widgets/common/loading_indicator.dart';
 import '../widgets/exam/isometric_work_area.dart';
 import '../widgets/exam/tool_tray.dart';
 import '../widgets/exam/color_palette.dart';
 import '../widgets/exam/feedback_overlay.dart';
-import '../../managers/exam_progress_manager.dart';
+
+// Temporary FeedbackController class (until implemented)
+class FeedbackController {
+  final _streamController = StreamController<String>.broadcast();
+  Stream<String> get stream => _streamController.stream;
+  
+  void showFeedback(String message) {
+    _streamController.add(message);
+  }
+  
+  void dispose() {
+    _streamController.close();
+  }
+}
+
+// Temporary ExamView interface (until implemented)
+abstract class ExamView {
+  void showLoading();
+  void hideLoading();
+  void updateExamTime(Duration time);
+  void updatePeriodTime(Duration time);
+  void updatePeriodInfo(String info);
+  void updateProgress(double progress);
+  void showExamComplete(ExamSession session);
+  void showError(String message);
+}
+
+// Temporary ExamPresenter class (until implemented)
+class ExamPresenter {
+  ExamView? _view;
+  
+  void attachView(ExamView view) {
+    _view = view;
+  }
+  
+  void startExam({required bool isPracticeMode}) {
+    _view?.updatePeriodInfo(isPracticeMode ? '손을(내손 -> 고객 손) 소독하세요' : '1차: 매니큐어 - 기본 매니큐어');
+    _view?.updateProgress(0.0);
+  }
+  
+  void dispose() {
+    _view = null;
+  }
+}
 
 class ExamScreen extends StatefulWidget {
   final bool isPracticeMode;
@@ -43,6 +86,22 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   // Track work area state through GlobalKey
   final GlobalKey<IsometricWorkAreaState> _workAreaKey =
       GlobalKey<IsometricWorkAreaState>();
+  
+  // Tutorial step tracking
+  int _currentTutorialStep = 1;
+  final List<String> _tutorialSteps = [
+    '손을(내손 -> 고객 손) 소독하세요',
+    '폴리쉬 제거(소지->약지)',
+    '네일파일로 모양 만들기',
+    '샌딩블록으로 표면 정리',
+    '핑거볼에 손 담그기',
+    '큐티클 오일 발라주기',
+    '큐티클 푸셔로 밀어올리기',
+    '니퍼로 큐티클 제거',
+    '소독 스프레이 뿌리기',
+    '멸균거즈로 오일 제거',
+    '컬러링 도포',
+  ];
 
   // Exam results for score tracking (exam mode only)
   int? _examScore;
@@ -120,6 +179,22 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
                 ],
               ),
             ),
+            // Add exit/complete buttons in landscape mode
+            if (MediaQuery.of(context).orientation == Orientation.landscape) ...[
+              TextButton(
+                onPressed: _showExitDialog,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red,
+                ),
+                child: const Text('나가기'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: _completePeriod,
+                child: const Text('완료'),
+              ),
+              const SizedBox(width: 8),
+            ],
           ],
         ),
         body: _isLoading
@@ -140,142 +215,83 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       'DEBUG: Building exam content for ${widget.isPracticeMode ? "Practice" : "Exam"} mode',
     );
 
-    return Row(
-      children: [
-        // Left panel - Controls and information
-        SizedBox(
-          width: 320,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // Timer section hidden for both modes (can be shown later if needed)
-                // _buildTimerSection(),
-                // Progress bar hidden for both modes (already in app bar for practice mode)
-                // _buildProgressBar(),
-                // Show period info card for both modes (exam mode shows "시험모드입니다")
-                _buildPeriodInfoCard(),
-                // Score display for exam mode
-                if (!widget.isPracticeMode) _buildScoreDisplay(),
-                // Main UI: Tools and Palette - same for both modes
-                // Show either palette or tools in the same space
-                if (_showColorPalette || _showToolTray)
-                  SizedBox(
-                    height: _showColorPalette
-                        ? 200
-                        : 120, // Smaller height for tool tray
-                    child: _showColorPalette
-                        ? ColorPalette(
-                            onColorSelected: _onColorSelected,
-                            selectedColor: _selectedColor,
-                            isVisible: _showColorPalette,
-                          )
-                        : ToolTray(
-                            onToolSelected: _onToolSelected,
-                            selectedTool: _selectedTool,
-                            selectedTools: _selectedTools,
-                            isVisible: _showToolTray,
-                            isHorizontal:
-                                true, // Horizontal layout in left panel
-                            requiredTools: widget.isPracticeMode
-                                ? (_workAreaKey.currentState
-                                          ?.getRequiredToolsForCurrentStep() ??
-                                      {})
-                                : {}, // No tool highlighting in exam mode
-                          ),
-                  ),
-                const SizedBox(height: 16),
-                // Use compact controls for both modes
-                _buildCompactControls(),
-              ],
-            ),
-          ),
-        ),
-
-        // Right side - Main work area
-        Expanded(child: _buildIsometricWorkArea()),
-      ],
+    return OrientationBuilder(
+      builder: (context, orientation) {
+        if (orientation == Orientation.landscape) {
+          return _buildLandscapeLayout();
+        } else {
+          return _buildPortraitLayout();
+        }
+      },
     );
   }
 
-  Widget _buildTimerSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
-        border: Border(
-          bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildTimerCard(
-            'Exam Time',
-            _formatDuration(_examTime),
-            Icons.schedule,
-          ),
-          _buildTimerCard(
-            'Period Time',
-            _formatDuration(_periodTime),
-            Icons.timer,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimerCard(String label, String time, IconData icon) {
+  Widget _buildPortraitLayout() {
     return Column(
       children: [
-        Icon(icon, size: 24, color: Theme.of(context).primaryColor),
-        const SizedBox(height: 4),
-        Text(
-          time,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontFamily: 'monospace',
-          ),
+        // 상단 정보 섹션 (Period Info + Score)
+        _buildTopInfoSection(),
+        
+        // 메인 작업 영역 (Isometric Work Area)
+        Expanded(
+          flex: 3, // 60% of available space
+          child: _buildMainWorkArea(),
         ),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-        ),
+        
+        // 하단 도구/컬러 섹션
+        _buildBottomToolSection(),
       ],
     );
   }
 
-  Widget _buildProgressBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.defaultPadding,
-        vertical: 8,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildLandscapeLayout() {
+    return Row(
+      children: [
+        // 왼쪽 도구 섹션
+        Container(
+          width: 200,
+          color: Theme.of(context).cardColor,
+          child: Column(
             children: [
-              Text('전체 진행과정', style: Theme.of(context).textTheme.bodySmall),
-              Text(
-                '${(_progress * 100).toInt()}%',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+              // 상단 정보 섹션
+              _buildTopInfoSection(),
+              const Divider(height: 1),
+              // 도구/컬러 토글
+              _buildToolToggleSection(),
+              const Divider(height: 1),
+              // 도구 트레이 또는 색상 팔레트
+              Expanded(
+                child: _showColorPalette ? _buildColorPalette() : _buildToolTray(),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: _progress,
-            backgroundColor: Colors.grey[300],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              Theme.of(context).primaryColor,
-            ),
+        ),
+        // 메인 작업 영역
+        Expanded(
+          child: _buildMainWorkArea(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopInfoSection() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      color: Theme.of(context).cardColor,
+      child: Row(
+        children: [
+          // Period Info Card
+          Expanded(
+            flex: 2,
+            child: _buildPeriodInfoCard(),
           ),
+          const SizedBox(width: 12),
+          // Score Display (exam mode only)
+          if (!widget.isPracticeMode)
+            Expanded(
+              flex: 1,
+              child: _buildScoreDisplay(),
+            ),
         ],
       ),
     );
@@ -283,163 +299,94 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
 
   Widget _buildPeriodInfoCard() {
     return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: AppConstants.defaultPadding,
-        vertical: 4,
-      ),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Column(
-            children: [
-              Text(
-                _currentPeriodInfo.isNotEmpty ? _currentPeriodInfo : '준비 중...',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: widget.isPracticeMode ? Colors.blue.shade50 : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: widget.isPracticeMode ? Colors.blue.shade200 : Colors.orange.shade200,
         ),
       ),
-    );
-  }
-
-  Widget _buildScoreDisplay() {
-    // Calculate current progress score based on completed steps
-    int currentScore = 0;
-    final workAreaState = _workAreaKey.currentState;
-
-    if (workAreaState != null) {
-      currentScore = workAreaState.getCurrentScore();
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: AppConstants.defaultPadding,
-        vertical: 4,
-      ),
-      child: Card(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '현재 점수:',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                '$currentScore/11',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: Theme.of(context).primaryColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactControls() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.defaultPadding,
-        vertical: 8,
-      ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Toggle buttons (compact) - only one can be active at a time
-          IconButton(
-            onPressed: () => setState(() {
-              _showColorPalette = false;
-              _showToolTray = true;
-            }),
-            icon: Icon(
-              Icons.build,
-              color: _showToolTray
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey,
-              size: 20,
-            ),
-            tooltip: '도구 트레이',
+          Row(
+            children: [
+              Icon(
+                widget.isPracticeMode ? Icons.school : Icons.timer,
+                size: 16,
+                color: widget.isPracticeMode ? Colors.blue.shade700 : Colors.orange.shade700,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                widget.isPracticeMode ? '연습모드' : '시험모드',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: widget.isPracticeMode ? Colors.blue.shade700 : Colors.orange.shade700,
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: () => setState(() {
-              _showColorPalette = true;
-              _showToolTray = false;
-            }),
-            icon: Icon(
-              Icons.palette,
-              color: _showColorPalette
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey,
-              size: 20,
-            ),
-            tooltip: '색상 팔레트',
-          ),
-          const Spacer(),
-          // Compact exit and complete buttons
-          TextButton(
-            onPressed: _showExitDialog,
-            child: const Text('나가기', style: TextStyle(fontSize: 12)),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: _completePeriod,
-            child: const Text('완료', style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(
+            _getTutorialStepMessage(),
+            style: const TextStyle(fontSize: 11, color: Colors.black87),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWorkArea() {
+  Widget _buildScoreDisplay() {
     return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: AppConstants.defaultPadding,
-      ),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor, width: 2),
-        borderRadius: BorderRadius.circular(AppConstants.defaultRadius),
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.shade200),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppConstants.defaultRadius),
-        child: Container(
-          color: Colors.grey[50],
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.touch_app, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'Work Area',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Isometric view and tools will be implemented in Phase 2',
-                  style: TextStyle(color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+      child: Column(
+        children: [
+          Icon(
+            Icons.star,
+            size: 16,
+            color: Colors.green.shade700,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${_examScore ?? 0}/11',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.green.shade700,
             ),
           ),
-        ),
+          Text(
+            '점수',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.green.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainWorkArea() {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor, width: 2),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[50],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: _buildIsometricWorkArea(),
       ),
     );
   }
@@ -449,526 +396,395 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       'DEBUG: Building isometric work area for ${widget.isPracticeMode ? "Practice" : "Exam"} mode',
     );
 
-    return Container(
-      margin: const EdgeInsets.all(AppConstants.defaultPadding),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor, width: 2),
-        borderRadius: BorderRadius.circular(AppConstants.defaultRadius),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppConstants.defaultRadius),
-        child: IsometricWorkArea(
-          key: _workAreaKey,
-          onDragUpdate: _onDragUpdate,
-          onToolApplied: _onToolApplied,
-          onGesture: _onGesture,
-          currentTool: _selectedTool,
-          selectedTools: _selectedTools,
-          currentPolishColor: _selectedColor,
-          isPracticeMode: widget.isPracticeMode,
-          onExamCompleted: widget.isPracticeMode ? null : _onExamCompleted,
-        ),
-      ),
+    return IsometricWorkArea(
+      key: _workAreaKey,
+      onDragUpdate: _onDragUpdate,
+      onToolApplied: _onToolApplied,
+      onGesture: _onGesture,
+      currentTool: _selectedTool,
+      selectedTools: _selectedTools,
+      currentPolishColor: _selectedColor,
+      isPracticeMode: widget.isPracticeMode,
+      onExamCompleted: widget.isPracticeMode ? null : _onExamCompleted,
+      onStepChanged: widget.isPracticeMode ? _onTutorialStepChanged : null,
     );
   }
 
-  Widget _buildControlsSection() {
+  Widget _buildBottomToolSection() {
     return Container(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor, width: 1),
-        ),
-      ),
-      child: Row(
+      height: 150, // Fixed height for bottom section
+      color: Theme.of(context).cardColor,
+      child: Column(
         children: [
+          // Tool/Color toggle buttons with exit/complete buttons
+          _buildPortraitToolToggleSection(),
+          const Divider(height: 1),
+          // Tool Tray or Color Palette
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _showExitDialog,
-              icon: const Icon(Icons.exit_to_app),
-              label: const Text('나가기'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: () => setState(() {
-              _showColorPalette = false;
-              _showToolTray = true;
-            }),
-            icon: Icon(
-              Icons.build,
-              color: _showToolTray
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey,
-            ),
-            tooltip: '도구 트레이',
-          ),
-          IconButton(
-            onPressed: () => setState(() {
-              _showColorPalette = true;
-              _showToolTray = false;
-            }),
-            icon: Icon(
-              Icons.palette,
-              color: _showColorPalette
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey,
-            ),
-            tooltip: '색상 팔레트',
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
-              onPressed: _completePeriod,
-              icon: const Icon(Icons.check),
-              label: const Text('구간 완료'),
-            ),
+            child: _showColorPalette ? _buildColorPalette() : _buildToolTray(),
           ),
         ],
       ),
     );
   }
 
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-
-    if (hours > 0) {
-      return '${hours.toString().padLeft(2, '0')}:'
-          '${minutes.toString().padLeft(2, '0')}:'
-          '${seconds.toString().padLeft(2, '0')}';
-    } else {
-      return '${minutes.toString().padLeft(2, '0')}:'
-          '${seconds.toString().padLeft(2, '0')}';
-    }
+  Widget _buildPortraitToolToggleSection() {
+    return Container(
+      height: 45,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        children: [
+          // Tool Tray Button
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() {
+                _showColorPalette = false;
+                _showToolTray = true;
+              }),
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _showToolTray 
+                    ? Theme.of(context).primaryColor.withOpacity(0.1)
+                    : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _showToolTray 
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey.shade300,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.build,
+                      size: 18,
+                      color: _showToolTray 
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '도구',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: _showToolTray ? FontWeight.bold : FontWeight.normal,
+                        color: _showToolTray 
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Color Palette Button
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() {
+                _showColorPalette = true;
+                _showToolTray = false;
+              }),
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _showColorPalette 
+                    ? Theme.of(context).primaryColor.withOpacity(0.1)
+                    : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _showColorPalette 
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey.shade300,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.palette,
+                      size: 18,
+                      color: _showColorPalette 
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '색상',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: _showColorPalette ? FontWeight.bold : FontWeight.normal,
+                        color: _showColorPalette 
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Spacer(),
+          // Exit and Complete buttons
+          TextButton(
+            onPressed: _showExitDialog,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+              minimumSize: const Size(50, 36),
+            ),
+            child: const Text('나가기', style: TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: _completePeriod,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(50, 36),
+            ),
+            child: const Text('완료', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _completePeriod() {
-    // Get current progress from work area
-    final workAreaState = _workAreaKey.currentState;
-    List<String> completedSteps = [];
-    List<String> remainingSteps = [];
-    int currentScore = 0;
-
-    if (workAreaState != null) {
-      currentScore = workAreaState.getCurrentScore();
-      final stepStatus = workAreaState.getStepCompletionStatus();
-
-      // Categorize steps as completed or remaining
-      stepStatus.forEach((stepName, isCompleted) {
-        if (isCompleted) {
-          completedSteps.add(stepName);
-        } else {
-          remainingSteps.add(stepName);
-        }
-      });
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('완료 확인'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildToolToggleSection() {
+    return Container(
+      height: 45,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Text(
-                '현재 진행 상황:',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '완료된 단계: $currentScore/11',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).primaryColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              if (completedSteps.isNotEmpty) ...[
-                Text(
-                  '✅ 완료한 단계:',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Colors.green.shade700,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ...completedSteps.map(
-                  (step) => Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 2),
-                    child: Text(
-                      step,
-                      style: TextStyle(color: Colors.green.shade600),
+              // Tool Tray Button
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() {
+                    _showColorPalette = false;
+                    _showToolTray = true;
+                  }),
+                  child: Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _showToolTray 
+                        ? Theme.of(context).primaryColor.withOpacity(0.1)
+                        : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _showToolTray 
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.build,
+                          size: 18,
+                          color: _showToolTray 
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '도구',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: _showToolTray ? FontWeight.bold : FontWeight.normal,
+                            color: _showToolTray 
+                              ? Theme.of(context).primaryColor
+                              : Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
-
-              if (remainingSteps.isNotEmpty) ...[
-                Text(
-                  '⏳ 남은 단계:',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Colors.orange.shade700,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ...remainingSteps.map(
-                  (step) => Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 2),
-                    child: Text(
-                      step,
-                      style: TextStyle(color: Colors.orange.shade600),
+              ),
+              const SizedBox(width: 8),
+              // Color Palette Button
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() {
+                    _showColorPalette = true;
+                    _showToolTray = false;
+                  }),
+                  child: Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _showColorPalette 
+                        ? Theme.of(context).primaryColor.withOpacity(0.1)
+                        : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _showColorPalette 
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.palette,
+                          size: 18,
+                          color: _showColorPalette 
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '색상',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: _showColorPalette ? FontWeight.bold : FontWeight.normal,
+                            color: _showColorPalette 
+                              ? Theme.of(context).primaryColor
+                              : Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
-
-              const Text(
-                '정말로 완료하시겠습니까?\n완료 후에는 수정할 수 없습니다.',
-                style: TextStyle(fontWeight: FontWeight.w500),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _presenter.completePeriod();
-            },
-            child: const Text('완료'),
-          ),
         ],
       ),
     );
   }
 
-  void _showExitDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(widget.isPracticeMode ? '연습 끝내기' : '시험 끝내기'),
-        content: Text(
-          widget.isPracticeMode ? '정말 연습을 끝내겠습니까?' : '정말 시험을 끝내겠습니까?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('계속하기'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _saveAndExit();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('저장하고 나가기'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void showLoading() {
-    setState(() {
-      _isLoading = true;
-    });
-  }
-
-  @override
-  void hideLoading() {
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  @override
-  void showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  @override
-  void showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
-  }
-
-  @override
-  void updateTimer(Duration examTime, Duration periodTime) {
-    setState(() {
-      _examTime = examTime;
-      _periodTime = periodTime;
-    });
-  }
-
-  @override
-  void showTimeWarning(String message) {
-    // Time warning messages disabled - no longer showing time remaining notifications
-  }
-
-  @override
-  void showPeriodInfo(int periodNumber, String technique) {
-    setState(() {
-      _currentPeriodInfo = '1과제 (매니큐어/오른손) 30분 / 20점';
-    });
-  }
-
-  @override
-  void updateProgress(double progress) {
-    setState(() {
-      _progress = progress;
-    });
-  }
-
-  @override
-  void navigateToResults(ExamSession session) {
-    AppRouter.navigateAndReplace(
-      context,
-      AppRouter.results,
-      arguments: session,
-    );
-  }
-
-  // Phase 2 callback methods
-  void _onToolSelected(Tool tool) {
-    setState(() {
-      // Handle special multi-tool selection for polish removal
-      if (tool.type == ToolType.remover || tool.type == ToolType.cottonPad) {
-        // Toggle tool in the selected set
-        if (_selectedTools.contains(tool)) {
-          _selectedTools.remove(tool);
-        } else {
+  Widget _buildToolTray() {
+    return ToolTray(
+      selectedTool: _selectedTool,
+      selectedTools: _selectedTools,
+      onToolSelected: (tool) {
+        setState(() {
+          _selectedTool = tool;
+          _selectedTools.clear();
           _selectedTools.add(tool);
+        });
+        
+        // Provide haptic feedback
+        HapticFeedback.lightImpact();
+        
+        // Clear color selection when tool is selected
+        if (_selectedColor != null) {
+          setState(() {
+            _selectedColor = null;
+          });
         }
-
-        // Check if both remover and cotton pad are selected
-        final hasRemover = _selectedTools.any(
-          (t) => t.type == ToolType.remover,
-        );
-        final hasCottonPad = _selectedTools.any(
-          (t) => t.type == ToolType.cottonPad,
-        );
-
-        if (hasRemover && hasCottonPad) {
-          // Both tools selected - create a combined tool
-          _selectedTool = tool; // Keep reference to last selected tool
-        } else {
-          _selectedTool = null; // Clear single tool selection
-        }
-      } else {
-        // Normal single tool selection
-        _selectedTool = tool;
-        _selectedTools.clear(); // Clear multi-selection
-      }
-    });
-    // Removed feedback modal - just update selection silently
+        
+        _feedbackController.showFeedback('${tool.name} 선택됨');
+        print('DEBUG: Tool selected: ${tool.name}');
+      },
+      isCompact: true, // Horizontal layout for bottom section
+    );
   }
 
-  void _onColorSelected(Color color) {
-    setState(() {
-      _selectedColor = color;
-    });
-    // Removed feedback modal - just update selection silently
+  Widget _buildColorPalette() {
+    return ColorPalette(
+      selectedColor: _selectedColor,
+      onColorSelected: (color) {
+        setState(() {
+          _selectedColor = color;
+        });
+        
+        // Provide haptic feedback
+        HapticFeedback.lightImpact();
+        
+        _feedbackController.showFeedback('색상 선택됨');
+        print('DEBUG: Color selected: ${color.toString()}');
+      },
+      isCompact: true, // Horizontal layout for bottom section
+    );
   }
 
+  // Gesture handlers
   void _onDragUpdate(Offset position) {
-    // Handle drag updates for real-time feedback
-    // This could show drag path or update tool preview
+    if (_selectedTool == null) {
+      _feedbackController.showFeedback('먼저 도구를 선택하세요');
+      return;
+    }
+    
+    // Handle drag gesture with selected tool
+    print('DEBUG: Drag at position: $position with tool: ${_selectedTool!.name}');
   }
 
-  void _onToolApplied(Tool tool) {
-    // Update progress based on tool application
-    // In a real implementation, this would calculate progress from work area state
+  void _onToolApplied(dynamic tool, Offset position) {
+    // Handle tool application
+    if (tool is Tool) {
+      setState(() {
+        tool.usageCount++;
+      });
+      
+      _feedbackController.showFeedback('${tool.name} 사용됨');
+      print('DEBUG: Tool applied: ${tool.name} at position: $position');
+    }
+  }
+
+  void _onGesture(String gestureType, Offset position) {
+    print('DEBUG: Gesture detected: $gestureType at position: $position');
+  }
+
+  void _onExamCompleted(Map<String, dynamic> results) {
     setState(() {
-      _progress = (_progress + 0.05).clamp(0.0, 1.0);
-      // Force refresh to update required tools highlighting
+      _examScore = results['score'] as int?;
+      _completedSteps = (results['completedSteps'] as List?)?.cast<String>();
+      _missedSteps = (results['missedSteps'] as List?)?.cast<String>();
     });
-
-    // Removed feedback modals - no visual feedback when clicking nails
+    
+    _showExamResults();
   }
 
-  void _onGesture(GestureType type, Offset position) {
-    // Handle different gesture types
-    switch (type) {
-      case GestureType.tap:
-        // Handle tap gesture
-        break;
-      case GestureType.drag:
-        // Handle drag gesture
-        break;
-      case GestureType.dragStart:
-        // Handle drag start gesture
-        break;
-      case GestureType.dragEnd:
-        // Handle drag end gesture
-        break;
-      case GestureType.pinch:
-        // Handle pinch/zoom gesture
-        break;
-      case GestureType.swipe:
-        // Handle swipe gesture
-        break;
-      case GestureType.longPress:
-        // Handle long press gesture
-        break;
-      case GestureType.doubleTab:
-        // Handle double tap gesture
-        break;
+  void _completePeriod() {
+    if (widget.isPracticeMode) {
+      _showPracticeCompleteDialog();
+    } else {
+      // For exam mode, trigger exam completion
+      _onExamCompleted({
+        'score': _examScore ?? 5,
+        'completedSteps': _completedSteps ?? ['기본 매니큐어 완료'],
+        'missedSteps': _missedSteps ?? [],
+      });
     }
   }
 
-  Future<void> _loadSavedProgress() async {
-    try {
-      final savedProgress = await ExamProgressManager.instance.loadProgress(
-        isPracticeMode: widget.isPracticeMode,
-      );
-
-      if (savedProgress != null) {
-        // Show dialog asking if user wants to continue from saved progress
-        if (mounted) {
-          _showLoadProgressDialog(savedProgress);
-        }
-      }
-    } catch (e) {
-      print('Error loading saved progress: $e');
-    }
-  }
-
-  void _showLoadProgressDialog(ExamProgress savedProgress) {
+  void _showPracticeCompleteDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('저장된 진행상황'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('저장된 진행상황이 있습니다.'),
-            const SizedBox(height: 8),
-            Text('점수: ${savedProgress.currentScore}/11'),
-            Text('저장 시간: ${_formatDateTime(savedProgress.savedAt)}'),
-            const SizedBox(height: 8),
-            const Text('계속하시겠습니까?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Start fresh
-            },
-            child: const Text('새로 시작'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _restoreProgress(savedProgress);
-            },
-            child: const Text('이어서 하기'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
-        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-  }
-
-  void _restoreProgress(ExamProgress progress) {
-    final workAreaState = _workAreaKey.currentState;
-    if (workAreaState != null) {
-      workAreaState.restoreProgress(progress);
-      setState(() {}); // Refresh UI
-    }
-  }
-
-  Future<void> _saveAndExit() async {
-    try {
-      final workAreaState = _workAreaKey.currentState;
-      if (workAreaState != null) {
-        final currentProgress = workAreaState.saveCurrentProgress();
-        await ExamProgressManager.instance.saveProgress(currentProgress);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('진행상황이 저장되었습니다'),
-              duration: Duration(seconds: 2),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('연습 완료'),
+          content: const Text('연습을 마치시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('계속 연습'),
             ),
-          );
-        }
-      }
-
-      // Navigate to home
-      AppRouter.navigateAndRemoveUntil(
-        context,
-        AppRouter.home,
-        (route) => false,
-      );
-    } catch (e) {
-      print('Error saving progress: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('저장에 실패했습니다'),
-            backgroundColor: Colors.red,
-          ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Return to home
+              },
+              child: const Text('완료'),
+            ),
+          ],
         );
-      }
-    }
-  }
-
-  void _onExamCompleted(
-    int score,
-    List<String> completedSteps,
-    List<String> missedSteps,
-  ) {
-    setState(() {
-      _examScore = score;
-      _completedSteps = completedSteps;
-      _missedSteps = missedSteps;
-    });
-
-    // Clear saved progress since exam is completed
-    ExamProgressManager.instance.clearProgress(
-      isPracticeMode: widget.isPracticeMode,
+      },
     );
-
-    // Show exam completion dialog with results
-    _showExamResultsDialog();
   }
 
-  void _showExamResultsDialog() {
+  void _showExamResults() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('시험 완료!'),
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('시험 완료'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1037,6 +853,161 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
           ),
         ],
       ),
+    );
+  }
+
+  void _showExitDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(widget.isPracticeMode ? '연습 종료' : '시험 종료'),
+          content: Text(widget.isPracticeMode 
+            ? '연습을 종료하시겠습니까?' 
+            : '시험을 종료하시겠습니까? 진행 상황이 저장되지 않습니다.'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Return to home
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('종료'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _loadSavedProgress() {
+    // Load any saved progress for practice mode
+    // This is where you'd load from local storage if implemented
+    print('DEBUG: Loading saved progress...');
+  }
+
+  // ExamView interface implementations
+  @override
+  void showLoading() {
+    setState(() {
+      _isLoading = true;
+    });
+  }
+
+  @override
+  void hideLoading() {
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  @override
+  void updateExamTime(Duration time) {
+    setState(() {
+      _examTime = time;
+    });
+  }
+
+  @override
+  void updatePeriodTime(Duration time) {
+    setState(() {
+      _periodTime = time;
+    });
+  }
+
+  @override
+  void updatePeriodInfo(String info) {
+    setState(() {
+      _currentPeriodInfo = info;
+    });
+  }
+
+  @override
+  void updateProgress(double progress) {
+    setState(() {
+      _progress = progress;
+    });
+  }
+  
+  String _getTutorialStepMessage() {
+    if (widget.isPracticeMode && _currentTutorialStep <= _tutorialSteps.length) {
+      return 'Step ${_currentTutorialStep}/11: ${_tutorialSteps[_currentTutorialStep - 1]}';
+    }
+    return _currentPeriodInfo.isNotEmpty ? _currentPeriodInfo : 
+           (widget.isPracticeMode ? '자유롭게 연습하세요' : '1차: 매니큐어 - 기본 매니큐어');
+  }
+  
+  void _onTutorialStepChanged(int newStep) {
+    setState(() {
+      _currentTutorialStep = newStep;
+      // Update progress based on step completion
+      _progress = (newStep - 1) / 11.0;
+    });
+    
+    // Show feedback for step completion
+    if (newStep <= _tutorialSteps.length) {
+      _feedbackController.showFeedback('Step ${newStep - 1} 완료! 다음 단계로 이동');
+    }
+    
+    if (newStep > 11) {
+      // All steps completed
+      _showTutorialCompleteDialog();
+    }
+  }
+  
+  void _showTutorialCompleteDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('🎉 튜토리얼 완료!'),
+          content: const Text('11단계 튜토리얼을 모두 완료했습니다!\n계속해서 자유롭게 연습하시거나 홈으로 돌아가세요.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Reset tutorial to continue practicing
+                setState(() {
+                  _currentTutorialStep = 1;
+                  _progress = 0.0;
+                });
+              },
+              child: const Text('다시 연습'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Return to home
+              },
+              child: const Text('홈으로'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void showExamComplete(ExamSession session) {
+    AppRouter.navigateAndReplace(
+      context,
+      AppRouter.results,
+      arguments: session,
+    );
+  }
+
+  @override
+  void showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
