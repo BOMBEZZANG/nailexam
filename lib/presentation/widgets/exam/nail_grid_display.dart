@@ -9,6 +9,8 @@ class NailGridDisplay extends StatelessWidget {
   final Function(int nailIndex, Offset localPosition)? onNailTap;
   final int? selectedNail;
   final double scale;
+  final Function(int nailIndex, double progress)? onPolishRemovalProgress;
+  final bool isPolishRemovalMode;
   
   const NailGridDisplay({
     super.key,
@@ -17,6 +19,8 @@ class NailGridDisplay extends StatelessWidget {
     this.onNailTap,
     this.selectedNail,
     this.scale = 1.0,
+    this.onPolishRemovalProgress,
+    this.isPolishRemovalMode = false,
   });
 
   @override
@@ -122,6 +126,8 @@ class NailGridDisplay extends StatelessWidget {
                   isPracticeMode: isPracticeMode,
                   scale: scale,
                   onTap: (localPosition) => onNailTap?.call(index, localPosition),
+                  onPolishRemovalProgress: onPolishRemovalProgress,
+                  isPolishRemovalMode: isPolishRemovalMode,
                 ),
               ),
             ),
@@ -173,6 +179,8 @@ class SingleNailWidget extends StatefulWidget {
   final bool isPracticeMode;
   final double scale;
   final Function(Offset localPosition)? onTap;
+  final Function(int nailIndex, double progress)? onPolishRemovalProgress;
+  final bool isPolishRemovalMode;
   
   const SingleNailWidget({
     super.key,
@@ -182,6 +190,8 @@ class SingleNailWidget extends StatefulWidget {
     this.isPracticeMode = false,
     this.scale = 1.0,
     this.onTap,
+    this.onPolishRemovalProgress,
+    this.isPolishRemovalMode = false,
   });
 
   @override
@@ -197,6 +207,13 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
   
   bool _showRipple = false;
   Offset? _ripplePosition;
+  
+  // Polish removal mechanics
+  double _polishRemovalProgress = 0.0;
+  List<Offset> _swipePoints = [];
+  Offset? _lastSwipePosition;
+  List<PolishParticle> _particles = [];
+  late AnimationController _particleController;
 
   @override
   void initState() {
@@ -227,12 +244,22 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
       parent: _flashController,
       curve: Curves.elasticOut,
     ));
+    
+    // Particle animation controller
+    _particleController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    )..repeat();
+    
+    // Initialize polish removal progress based on nail state
+    _polishRemovalProgress = widget.nailState.hasPolish ? 0.0 : 1.0;
   }
   
   @override
   void dispose() {
     _rippleController.dispose();
     _flashController.dispose();
+    _particleController.dispose();
     super.dispose();
   }
   
@@ -261,13 +288,26 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
     return LayoutBuilder(
       builder: (context, constraints) {
         return GestureDetector(
-          onTapDown: (details) {
+          onTapDown: widget.isPolishRemovalMode ? null : (details) {
             // Check if tap is within nail boundaries
             if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
               _triggerEffects(details.localPosition);
               widget.onTap?.call(details.localPosition);
             }
           },
+          onPanStart: widget.isPolishRemovalMode ? (details) {
+            if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
+              _startPolishRemoval(details.localPosition);
+            }
+          } : null,
+          onPanUpdate: widget.isPolishRemovalMode ? (details) {
+            if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
+              _updatePolishRemoval(details.localPosition, constraints.biggest);
+            }
+          } : null,
+          onPanEnd: widget.isPolishRemovalMode ? (details) {
+            _endPolishRemoval();
+          } : null,
           child: AnimatedBuilder(
             animation: Listenable.merge([_rippleAnimation, _flashAnimation]),
             builder: (context, child) {
@@ -296,6 +336,7 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
                         viewType: ViewType.topDown,
                         scale: widget.scale,
                         showGuides: widget.isPracticeMode && widget.isSelected,
+                        polishOpacity: widget.nailState.hasPolish ? 1.0 - _polishRemovalProgress : 0.0,
                       ),
                     ),
                   ),
@@ -344,6 +385,65 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
                         ),
                       ),
                     ),
+                  
+                  // Polish particles
+                  if (_particles.isNotEmpty)
+                    ...List.generate(_particles.length, (index) {
+                      final particle = _particles[index];
+                      return AnimatedBuilder(
+                        animation: _particleController,
+                        builder: (context, child) {
+                          final progress = (DateTime.now().millisecondsSinceEpoch - particle.createdAt) / 1000.0;
+                          if (progress > 1.0) {
+                            return const SizedBox.shrink();
+                          }
+                          
+                          final opacity = 1.0 - progress;
+                          final dy = particle.position.dy + (progress * 50);
+                          
+                          return Positioned(
+                            left: particle.position.dx - 4,
+                            top: dy - 4,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: particle.color.withOpacity(opacity * 0.8),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
+                  
+                  // Polish removal progress indicator - show on nails that need removal (약지, 새끼)
+                  if (widget.isPolishRemovalMode && 
+                      (widget.nailIndex == 3 || widget.nailIndex == 4) && 
+                      widget.nailState.hasPolish && 
+                      _polishRemovalProgress > 0)
+                    Positioned(
+                      bottom: 8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${(_polishRemovalProgress * 100).toInt()}%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               );
             },
@@ -351,6 +451,60 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
         );
       },
     );
+  }
+  
+  void _startPolishRemoval(Offset position) {
+    setState(() {
+      _swipePoints.clear();
+      _swipePoints.add(position);
+      _lastSwipePosition = position;
+    });
+  }
+  
+  void _updatePolishRemoval(Offset position, Size widgetSize) {
+    if (_lastSwipePosition == null) return;
+    
+    // Calculate swipe distance
+    final distance = (position - _lastSwipePosition!).distance;
+    
+    // Only process if moved enough distance
+    if (distance > 5) {
+      setState(() {
+        // Add to swipe points
+        _swipePoints.add(position);
+        if (_swipePoints.length > 20) {
+          _swipePoints.removeAt(0);
+        }
+        
+        // Increase removal progress based on swipe
+        _polishRemovalProgress = (_polishRemovalProgress + 0.02).clamp(0.0, 1.0);
+        
+        // Create particles
+        if (_polishRemovalProgress < 1.0 && math.Random().nextDouble() > 0.3) {
+          _particles.add(PolishParticle(
+            position: position,
+            color: widget.nailState.polishColor,
+            createdAt: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
+        
+        // Clean old particles
+        final now = DateTime.now().millisecondsSinceEpoch;
+        _particles.removeWhere((p) => now - p.createdAt > 1000);
+        
+        _lastSwipePosition = position;
+        
+        // Notify progress
+        widget.onPolishRemovalProgress?.call(widget.nailIndex, _polishRemovalProgress);
+      });
+    }
+  }
+  
+  void _endPolishRemoval() {
+    setState(() {
+      _swipePoints.clear();
+      _lastSwipePosition = null;
+    });
   }
   
   bool _isWithinNailBounds(Offset tapPosition, Size widgetSize) {
@@ -494,4 +648,16 @@ class SparkleEffectPainter extends CustomPainter {
   bool shouldRepaint(SparkleEffectPainter oldDelegate) {
     return oldDelegate.animation != animation || oldDelegate.color != color;
   }
+}
+
+class PolishParticle {
+  final Offset position;
+  final Color color;
+  final int createdAt;
+  
+  PolishParticle({
+    required this.position,
+    required this.color,
+    required this.createdAt,
+  });
 }

@@ -45,6 +45,7 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   // Tutorial system for practice mode
   int _currentStep = 1;
   Map<int, Set<int>> _stepProgress = {}; // step -> set of completed nail indices
+  Map<int, double> _nailPolishRemovalProgress = {}; // nail index -> removal progress
   Map<int, Set<ToolType>> _stepRequiredTools = {
     1: {ToolType.handSanitizer}, // 손을(내손 -> 고객 손) 소독하세요
     2: {ToolType.remover, ToolType.cottonPad}, // 폴리쉬 제거(소지->약지)
@@ -154,21 +155,10 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   void _handleStepProgress(Tool tool, int nailIndex) {
     // Check if this nail is a target for the current step
     if (_stepTargetNails[_currentStep]?.contains(nailIndex) == true) {
-      // Special handling for step 2 (polish removal) - requires both tools
+      // Special handling for step 2 (polish removal) - handled by swipe mechanic
       if (_currentStep == 2) {
-        if (_hasRequiredToolsForStep2()) {
-          // Remove polish and mark step progress
-          setState(() {
-            _nailStates[nailIndex].hasPolish = false;
-            _nailStates[nailIndex].polishCoverage = 0.0;
-            _stepProgress[_currentStep]?.add(nailIndex);
-          });
-          
-          // Check if current step is completed
-          if (_isStepCompleted(_currentStep)) {
-            _advanceToNextStep();
-          }
-        }
+        // Step 2 progress is handled by _onPolishRemovalProgress
+        return;
       } else {
         // For other steps, check if the current tool is one of the required tools
         if (_stepRequiredTools[_currentStep]?.contains(tool.type) == true) {
@@ -183,6 +173,30 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
         }
       }
     }
+  }
+  
+  void _onPolishRemovalProgress(int nailIndex, double progress) {
+    if (_currentStep != 2) return;
+    if (!_hasRequiredToolsForStep2()) return;
+    if (_stepTargetNails[2]?.contains(nailIndex) != true) return;
+    
+    setState(() {
+      _nailPolishRemovalProgress[nailIndex] = progress;
+      
+      // Update nail state when fully removed
+      if (progress >= 1.0 && _nailStates[nailIndex].hasPolish) {
+        _nailStates[nailIndex] = _nailStates[nailIndex].copyWith(
+          hasPolish: false,
+          polishCoverage: 0.0,
+        );
+        _stepProgress[_currentStep]?.add(nailIndex);
+        
+        // Check if current step is completed
+        if (_isStepCompleted(_currentStep)) {
+          _advanceToNextStep();
+        }
+      }
+    });
   }
   
   bool _hasRequiredToolsForStep2() {
@@ -285,6 +299,8 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
                     isPracticeMode: widget.isPracticeMode,
                     selectedNail: _selectedFingerIndex,
                     onNailTap: _onNailTapped,
+                    isPolishRemovalMode: widget.isPracticeMode && _currentStep == 2,
+                    onPolishRemovalProgress: _onPolishRemovalProgress,
                   ),
                 ),
               ),

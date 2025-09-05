@@ -21,6 +21,7 @@ class NailPainter extends CustomPainter {
   final ViewType viewType;
   final double scale;
   final bool showGuides;
+  final double polishOpacity;
   
   NailPainter({
     required this.nailState,
@@ -28,6 +29,7 @@ class NailPainter extends CustomPainter {
     this.viewType = ViewType.topDown,
     this.scale = 1.0,
     this.showGuides = false,
+    this.polishOpacity = 1.0,
   });
 
   @override
@@ -214,10 +216,10 @@ class NailPainter extends CustomPainter {
   }
   
   void _drawPolish(Canvas canvas, Size size, Offset center) {
-    if (!nailState.hasPolish) return;
+    if (!nailState.hasPolish || polishOpacity <= 0) return;
     
     final polishPaint = Paint()
-      ..color = nailState.polishColor.withOpacity(0.8)
+      ..color = nailState.polishColor.withOpacity(0.8 * polishOpacity)
       ..style = PaintingStyle.fill;
     
     final nailRect = _getNailRect(size, center);
@@ -235,7 +237,7 @@ class NailPainter extends CustomPainter {
     
     // Add polish shine
     final shinePaint = Paint()
-      ..color = Colors.white.withOpacity(nailState.shineLevel * 0.4)
+      ..color = Colors.white.withOpacity(nailState.shineLevel * 0.4 * polishOpacity)
       ..style = PaintingStyle.fill
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
     
@@ -370,7 +372,8 @@ class NailPainter extends CustomPainter {
            oldDelegate.nailShape != nailShape ||
            oldDelegate.viewType != viewType ||
            oldDelegate.scale != scale ||
-           oldDelegate.showGuides != showGuides;
+           oldDelegate.showGuides != showGuides ||
+           oldDelegate.polishOpacity != polishOpacity;
   }
 }
 

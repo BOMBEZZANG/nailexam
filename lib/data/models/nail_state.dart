@@ -58,6 +58,40 @@ class NailState {
   static Color _colorFromJson(int value) => Color(value);
   static int _colorToJson(Color color) => color.value;
   
+  NailState copyWith({
+    int? fingerIndex,
+    bool? hasCuticle,
+    bool? hasPolish,
+    Color? polishColor,
+    double? polishCoverage,
+    bool? needsFiling,
+    bool? hasExtension,
+    ExtensionType? extensionType,
+    NailCondition? condition,
+    double? shineLevel,
+    double? length,
+    bool? hasBaseCoat,
+    bool? hasTopCoat,
+    List<String>? appliedActions,
+  }) {
+    return NailState(
+      fingerIndex: fingerIndex ?? this.fingerIndex,
+      hasCuticle: hasCuticle ?? this.hasCuticle,
+      hasPolish: hasPolish ?? this.hasPolish,
+      polishColor: polishColor ?? this.polishColor,
+      polishCoverage: polishCoverage ?? this.polishCoverage,
+      needsFiling: needsFiling ?? this.needsFiling,
+      hasExtension: hasExtension ?? this.hasExtension,
+      extensionType: extensionType ?? this.extensionType,
+      condition: condition ?? this.condition,
+      shineLevel: shineLevel ?? this.shineLevel,
+      length: length ?? this.length,
+      hasBaseCoat: hasBaseCoat ?? this.hasBaseCoat,
+      hasTopCoat: hasTopCoat ?? this.hasTopCoat,
+      appliedActions: appliedActions ?? List<String>.from(this.appliedActions),
+    );
+  }
+  
   factory NailState.fromJson(Map<String, dynamic> json) => 
       _$NailStateFromJson(json);
   

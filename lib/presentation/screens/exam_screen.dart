@@ -1014,6 +1014,13 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       _feedbackController.showFeedback('${_tutorialSteps[newStep - 2]} 완료');
     }
     
+    // Show special guide for step 2 (polish removal)
+    if (newStep == 2) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _feedbackController.showFeedback('네일을 꾹 누르고 문질러 주세요');
+      });
+    }
+    
     if (newStep > 11) {
       // All steps completed
       _showTutorialCompleteDialog();
