@@ -7,19 +7,21 @@ part of 'period_data.dart';
 // **************************************************************************
 
 PeriodData _$PeriodDataFromJson(Map<String, dynamic> json) => PeriodData(
-      periodNumber: json['periodNumber'] as int,
-      assignedTechnique: json['assignedTechnique'] as String,
-      startTime: DateTime.parse(json['startTime'] as String),
-      endTime: json['endTime'] == null
+  periodNumber: (json['periodNumber'] as num).toInt(),
+  assignedTechnique: json['assignedTechnique'] as String,
+  startTime: DateTime.parse(json['startTime'] as String),
+  endTime:
+      json['endTime'] == null
           ? null
           : DateTime.parse(json['endTime'] as String),
-      actions: (json['actions'] as List<dynamic>?)
+  actions:
+      (json['actions'] as List<dynamic>?)
           ?.map((e) => ActionLog.fromJson(e as Map<String, dynamic>))
           .toList(),
-      scoreBreakdown: (json['scoreBreakdown'] as Map<String, dynamic>?)?.map(
-        (k, e) => MapEntry(k, (e as num).toDouble()),
-      ),
-    );
+  scoreBreakdown: (json['scoreBreakdown'] as Map<String, dynamic>?)?.map(
+    (k, e) => MapEntry(k, (e as num).toDouble()),
+  ),
+);
 
 Map<String, dynamic> _$PeriodDataToJson(PeriodData instance) =>
     <String, dynamic>{

@@ -21,6 +21,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   bool _isInitializing = true;
   bool _adShown = false;
+  bool _navigationCompleted = false;
 
   @override
   void initState() {
@@ -32,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
   void _setupAnimations() {
     // Logo animation
     _logoAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1500), // 빠르게 조정
       vsync: this,
     );
 
@@ -54,7 +55,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Loading animation
     _loadingAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1000), // 빠르게 조정
       vsync: this,
     );
 
@@ -68,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Start animations
     _logoAnimationController.forward();
-    Future.delayed(const Duration(milliseconds: 1000), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         _loadingAnimationController.forward();
       }
@@ -77,20 +78,32 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initializeApp() async {
     try {
-      // Initialize AdMob
-      await AdManager.instance.initialize();
+      print('Starting app initialization...');
       
-      // Wait for minimum splash time and ad loading (extended for retry attempts)
-      await Future.delayed(const Duration(seconds: 15));
-
+      // 최소 스플래시 시간 보장 (UI 완성도를 위해)
+      final minimumSplashTime = Future.delayed(const Duration(seconds: 2));
+      
+      // AdMob 초기화를 백그라운드에서 시작 (블로킹하지 않음)
+      final adInitialization = _initializeAdsInBackground();
+      
+      // 필수 초기화 작업들 (빠르게 완료되어야 함)
+      await _performEssentialInitialization();
+      
+      // 최소 스플래시 시간 대기
+      await minimumSplashTime;
+      
+      print('Essential initialization completed');
+      
       if (mounted) {
         setState(() {
           _isInitializing = false;
         });
         
-        // Wait a bit more for UI to update
-        await Future.delayed(const Duration(milliseconds: 500));
-        _showAdAndNavigate();
+        // UI 업데이트 후 잠시 대기
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        // 광고 초기화가 완료되었는지 확인하고 진행
+        await _waitForAdInitializationAndNavigate(adInitialization);
       }
     } catch (e) {
       print('Error during app initialization: $e');
@@ -100,12 +113,48 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
+  Future<void> _performEssentialInitialization() async {
+    // 여기에 필수적인 초기화 작업들을 추가
+    // 예: 데이터베이스 초기화, 설정 로드 등
+    
+    // 시뮬레이션용 짧은 대기 (실제로는 필요한 초기화 작업으로 대체)
+    await Future.delayed(const Duration(milliseconds: 500));
+    print('Essential services initialized');
+  }
+
+  Future<void> _initializeAdsInBackground() async {
+    try {
+      print('Initializing AdMob in background...');
+      await AdManager.instance.initialize();
+      print('AdMob initialization completed');
+    } catch (e) {
+      print('AdMob initialization failed: $e');
+    }
+  }
+
+  Future<void> _waitForAdInitializationAndNavigate(Future<void> adInitialization) async {
+    // 광고 초기화를 최대 3초까지만 기다림
+    try {
+      await adInitialization.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print('AdMob initialization timed out, proceeding anyway');
+        },
+      );
+    } catch (e) {
+      print('AdMob initialization error: $e');
+    }
+    
+    _showAdAndNavigate();
+  }
+
   void _showAdAndNavigate() {
-    if (_adShown) return;
+    if (_adShown || _navigationCompleted) return;
     
     print('Checking ad availability...');
     if (AdManager.instance.isAdAvailable) {
       print('Ad is available, attempting to show...');
+      _adShown = true;
       AdManager.instance.showAppOpenAd(
         onAdShown: () {
           print('App open ad shown');
@@ -119,7 +168,6 @@ class _SplashScreenState extends State<SplashScreen>
           _navigateToHome();
         },
       );
-      _adShown = true;
     } else {
       print('No ad available, navigating directly to home');
       _navigateToHome();
@@ -127,7 +175,11 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigateToHome() {
+    if (_navigationCompleted) return;
+    _navigationCompleted = true;
+    
     if (mounted) {
+      print('Navigating to home screen...');
       AppRouter.navigateAndRemoveUntil(
         context,
         AppRouter.home,
@@ -167,7 +219,6 @@ class _SplashScreenState extends State<SplashScreen>
         ),
         child: SafeArea(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(flex: 2),
               
@@ -175,29 +226,29 @@ class _SplashScreenState extends State<SplashScreen>
               AnimatedBuilder(
                 animation: _logoAnimationController,
                 builder: (context, child) {
-                  return Transform.scale(
-                    scale: _logoScaleAnimation.value,
-                    child: Opacity(
-                      opacity: _logoOpacityAnimation.value,
+                  return Opacity(
+                    opacity: _logoOpacityAnimation.value,
+                    child: Transform.scale(
+                      scale: _logoScaleAnimation.value,
                       child: Column(
                         children: [
-                          // App icon placeholder
+                          // Main logo/icon
                           Container(
                             width: 120,
                             height: 120,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(30),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black26,
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
                               ],
                             ),
                             child: const Icon(
-                              Icons.colorize,
+                              Icons.brush,
                               size: 60,
                               color: Color(0xFFFF6B9D),
                             ),
@@ -206,20 +257,36 @@ class _SplashScreenState extends State<SplashScreen>
                           const SizedBox(height: 30),
                           
                           // App title
-                          const Text(
-                            'NAIL MASTER',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 3,
-                              shadows: [
-                                Shadow(
-                                  offset: Offset(0, 2),
-                                  blurRadius: 10,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(25),
+                              boxShadow: [
+                                BoxShadow(
                                   color: Colors.black26,
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
                                 ),
                               ],
+                            ),
+                            child: const Text(
+                              'NAIL EXAM',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFB83B5E),
+                                letterSpacing: 2,
+                                shadows: [
+                                  Shadow(
+                                    blurRadius: 3,
+                                    color: Colors.black26,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           

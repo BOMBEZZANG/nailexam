@@ -18,13 +18,23 @@ class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case splash:
-        return MaterialPageRoute(
-          builder: (_) => const SplashScreen(),
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const SplashScreen(),
+          transitionDuration: Duration.zero, // 즉시 전환 (깜빡거림 방지)
+          reverseTransitionDuration: Duration.zero,
         );
         
       case home:
-        return MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // 부드러운 페이드 전환
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 300),
         );
         
       case examSetup:

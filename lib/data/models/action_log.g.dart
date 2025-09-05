@@ -7,13 +7,13 @@ part of 'action_log.dart';
 // **************************************************************************
 
 ActionLog _$ActionLogFromJson(Map<String, dynamic> json) => ActionLog(
-      actionType: json['actionType'] as String,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-      data: json['data'] as Map<String, dynamic>? ?? const <String, dynamic>{},
-    );
+  actionType: json['actionType'] as String,
+  timestamp: DateTime.parse(json['timestamp'] as String),
+  data: json['data'] as Map<String, dynamic>?,
+);
 
 Map<String, dynamic> _$ActionLogToJson(ActionLog instance) => <String, dynamic>{
-      'actionType': instance.actionType,
-      'timestamp': instance.timestamp.toIso8601String(),
-      'data': instance.data,
-    };
+  'actionType': instance.actionType,
+  'timestamp': instance.timestamp.toIso8601String(),
+  'data': instance.data,
+};

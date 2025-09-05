@@ -7,22 +7,22 @@ part of 'tool.dart';
 // **************************************************************************
 
 Tool _$ToolFromJson(Map<String, dynamic> json) => Tool(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      type: ToolType.values.firstWhere((e) => e.toString().split('.').last == json['type']),
-      iconPath: json['iconPath'] as String,
-      isConsumable: json['isConsumable'] as bool? ?? false,
-      usageCount: json['usageCount'] as int? ?? 0,
-    );
+  id: json['id'] as String,
+  name: json['name'] as String,
+  type: $enumDecode(_$ToolTypeEnumMap, json['type']),
+  description: json['description'] as String,
+  isConsumable: json['isConsumable'] as bool? ?? false,
+  usageCount: (json['usageCount'] as num?)?.toInt() ?? 0,
+);
 
 Map<String, dynamic> _$ToolToJson(Tool instance) => <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'type': instance.type.toString().split('.').last,
-      'iconPath': instance.iconPath,
-      'isConsumable': instance.isConsumable,
-      'usageCount': instance.usageCount,
-    };
+  'id': instance.id,
+  'name': instance.name,
+  'type': _$ToolTypeEnumMap[instance.type]!,
+  'description': instance.description,
+  'isConsumable': instance.isConsumable,
+  'usageCount': instance.usageCount,
+};
 
 const _$ToolTypeEnumMap = {
   ToolType.nailFile: 'nailFile',
@@ -32,10 +32,12 @@ const _$ToolTypeEnumMap = {
   ToolType.nailTips: 'nailTips',
   ToolType.cottonPad: 'cottonPad',
   ToolType.cuticleNipper: 'cuticleNipper',
+  ToolType.handSanitizer: 'handSanitizer',
   ToolType.uvLamp: 'uvLamp',
   ToolType.remover: 'remover',
-  ToolType.handSanitizer: 'handSanitizer',
   ToolType.sandingBlock: 'sandingBlock',
   ToolType.fingerBowl: 'fingerBowl',
   ToolType.cuticleOil: 'cuticleOil',
+  ToolType.disinfectantSpray: 'disinfectantSpray',
+  ToolType.sterilizedGauze: 'sterilizedGauze',
 };
