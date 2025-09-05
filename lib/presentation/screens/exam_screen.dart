@@ -679,7 +679,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
           });
         }
         
-        _feedbackController.showFeedback('${tool.name} 선택됨');
+        // Removed tool selection feedback message
         print('DEBUG: Tool selected: ${tool.name}');
       },
       isCompact: true, // Horizontal layout for bottom section
@@ -697,7 +697,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
         // Provide haptic feedback
         HapticFeedback.lightImpact();
         
-        _feedbackController.showFeedback('색상 선택됨');
+        // Removed color selection feedback message
         print('DEBUG: Color selected: ${color.toString()}');
       },
       isCompact: true, // Horizontal layout for bottom section
@@ -722,7 +722,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
         tool.usageCount++;
       });
       
-      _feedbackController.showFeedback('${tool.name} 사용됨');
+      // Removed tool usage feedback message
       print('DEBUG: Tool applied: ${tool.name} at position: $position');
     }
   }
@@ -953,8 +953,8 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
     });
     
     // Show feedback for step completion
-    if (newStep <= _tutorialSteps.length) {
-      _feedbackController.showFeedback('Step ${newStep - 1} 완료! 다음 단계로 이동');
+    if (newStep - 1 >= 1 && newStep - 1 <= _tutorialSteps.length) {
+      _feedbackController.showFeedback('${_tutorialSteps[newStep - 2]} 완료');
     }
     
     if (newStep > 11) {
