@@ -671,9 +671,28 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       highlightedTools: highlightedTools,
       onToolSelected: (tool) {
         setState(() {
-          _selectedTool = tool;
-          _selectedTools.clear();
-          _selectedTools.add(tool);
+          // Special handling for step 2 - allow multiple tool selection
+          if (widget.isPracticeMode && _currentTutorialStep == 2) {
+            // For step 2, allow selecting both remover and cotton pad
+            if (_selectedTools.contains(tool)) {
+              // If tool is already selected, deselect it
+              _selectedTools.remove(tool);
+              if (_selectedTool == tool) {
+                _selectedTool = _selectedTools.isNotEmpty ? _selectedTools.first : null;
+              }
+            } else {
+              // Add tool to selection if it's required for step 2
+              if (tool.type == ToolType.remover || tool.type == ToolType.cottonPad) {
+                _selectedTools.add(tool);
+                _selectedTool = tool; // Set as primary selected tool
+              }
+            }
+          } else {
+            // For other steps, single tool selection
+            _selectedTool = tool;
+            _selectedTools.clear();
+            _selectedTools.add(tool);
+          }
         });
         
         // Provide haptic feedback
@@ -713,13 +732,27 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
 
   // Gesture handlers
   void _onDragUpdate(Offset position) {
-    if (_selectedTool == null) {
+    // Check if tools are selected
+    if (_selectedTools.isEmpty) {
       _feedbackController.showFeedback('먼저 도구를 선택하세요');
       return;
     }
     
+    // Special check for step 2 - both tools required
+    if (widget.isPracticeMode && _currentTutorialStep == 2) {
+      bool hasRemover = _selectedTools.any((tool) => tool.type == ToolType.remover);
+      bool hasCottonPad = _selectedTools.any((tool) => tool.type == ToolType.cottonPad);
+      
+      if (!hasRemover || !hasCottonPad) {
+        _feedbackController.showFeedback('폴리쉬 제거를 위해 제거제와 코튼패드를 모두 선택하세요');
+        return;
+      }
+    }
+    
     // Handle drag gesture with selected tool
-    print('DEBUG: Drag at position: $position with tool: ${_selectedTool!.name}');
+    if (_selectedTool != null) {
+      print('DEBUG: Drag at position: $position with tool: ${_selectedTool!.name}');
+    }
   }
 
   void _onToolApplied(dynamic tool, Offset position) {

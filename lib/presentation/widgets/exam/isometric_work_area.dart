@@ -152,20 +152,54 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   }
   
   void _handleStepProgress(Tool tool, int nailIndex) {
-    // Check if the current tool is one of the required tools for current step
-    if (_stepRequiredTools[_currentStep]?.contains(tool.type) == true) {
-      // Check if this nail is a target for the current step
-      if (_stepTargetNails[_currentStep]?.contains(nailIndex) == true) {
-        setState(() {
-          _stepProgress[_currentStep]?.add(nailIndex);
-        });
-        
-        // Check if current step is completed
-        if (_isStepCompleted(_currentStep)) {
-          _advanceToNextStep();
+    // Check if this nail is a target for the current step
+    if (_stepTargetNails[_currentStep]?.contains(nailIndex) == true) {
+      // Special handling for step 2 (polish removal) - requires both tools
+      if (_currentStep == 2) {
+        if (_hasRequiredToolsForStep2()) {
+          // Remove polish and mark step progress
+          setState(() {
+            _nailStates[nailIndex].hasPolish = false;
+            _nailStates[nailIndex].polishCoverage = 0.0;
+            _stepProgress[_currentStep]?.add(nailIndex);
+          });
+          
+          // Check if current step is completed
+          if (_isStepCompleted(_currentStep)) {
+            _advanceToNextStep();
+          }
+        }
+      } else {
+        // For other steps, check if the current tool is one of the required tools
+        if (_stepRequiredTools[_currentStep]?.contains(tool.type) == true) {
+          setState(() {
+            _stepProgress[_currentStep]?.add(nailIndex);
+          });
+          
+          // Check if current step is completed
+          if (_isStepCompleted(_currentStep)) {
+            _advanceToNextStep();
+          }
         }
       }
     }
+  }
+  
+  bool _hasRequiredToolsForStep2() {
+    // Check if both remover and cotton pad are selected
+    if (widget.selectedTools == null) return false;
+    
+    bool hasRemover = false;
+    bool hasCottonPad = false;
+    
+    for (var tool in widget.selectedTools!) {
+      if (tool is Tool) {
+        if (tool.type == ToolType.remover) hasRemover = true;
+        if (tool.type == ToolType.cottonPad) hasCottonPad = true;
+      }
+    }
+    
+    return hasRemover && hasCottonPad;
   }
   
   bool _isStepCompleted(int step) {
