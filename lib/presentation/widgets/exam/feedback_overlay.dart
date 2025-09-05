@@ -71,8 +71,11 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
     });
 
     _animationController.forward().then((_) {
-      // Auto-hide after 2.5 seconds
-      _hideTimer = Timer(const Duration(milliseconds: 2500), () {
+      // Auto-hide after 2.5 seconds (longer for guide messages)
+      final duration = message.contains('문질러') || message.contains('꾹') 
+          ? const Duration(milliseconds: 4000) 
+          : const Duration(milliseconds: 2500);
+      _hideTimer = Timer(duration, () {
         if (mounted && _isVisible) {
           _hideFeedback();
         }
@@ -105,8 +108,11 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
       return const SizedBox.shrink();
     }
 
+    final isCentered = _currentMessage.contains('문질러') || _currentMessage.contains('꾹');
+    
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 10,
+      top: isCentered ? null : MediaQuery.of(context).padding.top + 10,
+      bottom: isCentered ? MediaQuery.of(context).size.height * 0.4 : null,
       left: 16,
       right: 16,
       child: AnimatedBuilder(
@@ -121,20 +127,26 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
                 child: GestureDetector(
                   onTap: _hideFeedback,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCentered ? 32 : 20, 
+                      vertical: isCentered ? 20 : 14,
+                    ),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
+                        colors: isCentered ? [
+                          Colors.orange.shade600,
+                          Colors.orange.shade400,
+                        ] : [
                           Theme.of(context).primaryColor,
                           Theme.of(context).primaryColor.withOpacity(0.8),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(25),
+                      borderRadius: BorderRadius.circular(isCentered ? 30 : 25),
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(context).primaryColor.withOpacity(0.3),
+                          color: (isCentered ? Colors.orange : Theme.of(context).primaryColor).withOpacity(0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                           spreadRadius: 2,
@@ -155,19 +167,19 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
                             color: Colors.white.withOpacity(0.2),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.check_circle,
+                          child: Icon(
+                            isCentered ? Icons.touch_app : Icons.check_circle,
                             color: Colors.white,
-                            size: 18,
+                            size: isCentered ? 24 : 18,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             _currentMessage,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
+                              fontSize: isCentered ? 18 : 14,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.5,
                             ),

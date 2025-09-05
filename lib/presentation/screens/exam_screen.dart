@@ -92,7 +92,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   int _currentTutorialStep = 1;
   final List<String> _tutorialSteps = [
     '손을(내손 -> 고객 손) 소독하세요',
-    '폴리쉬 제거(소지->약지)',
+    '폴리쉬 제거 (모든 손가락)',
     '네일파일로 모양 만들기',
     '샌딩블록으로 표면 정리',
     '핑거볼에 손 담그기',

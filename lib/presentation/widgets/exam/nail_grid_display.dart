@@ -417,9 +417,8 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
                       );
                     }),
                   
-                  // Polish removal progress indicator - show on nails that need removal (약지, 새끼)
+                  // Polish removal progress indicator - show on all nails during step 2
                   if (widget.isPolishRemovalMode && 
-                      (widget.nailIndex == 3 || widget.nailIndex == 4) && 
                       widget.nailState.hasPolish && 
                       _polishRemovalProgress > 0)
                     Positioned(

@@ -62,7 +62,7 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   
   Map<int, Set<int>> _stepTargetNails = {
     1: {0, 1, 2, 3, 4}, // 모든 손가락
-    2: {3, 4},          // 약지, 소지
+    2: {0, 1, 2, 3, 4}, // 모든 손가락 - 전체 폴리쉬 제거
     3: {0, 1, 2, 3, 4}, // 모든 손가락
     4: {0, 1, 2, 3, 4}, // 모든 손가락
     5: {0, 1, 2, 3, 4}, // 모든 손가락
@@ -136,6 +136,7 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
       
       // Tutorial step tracking for practice mode
       if (widget.isPracticeMode && widget.currentTool is Tool) {
+        print('DEBUG: Tool applied - ${(widget.currentTool as Tool).name} on nail $nailIndex, current step: $_currentStep');
         _handleStepProgress(widget.currentTool as Tool, nailIndex);
       }
     }
@@ -153,15 +154,23 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   }
   
   void _handleStepProgress(Tool tool, int nailIndex) {
+    print('DEBUG: _handleStepProgress called - tool: ${tool.type}, nail: $nailIndex, step: $_currentStep');
+    print('DEBUG: Required tools for step $_currentStep: ${_stepRequiredTools[_currentStep]}');
+    print('DEBUG: Target nails for step $_currentStep: ${_stepTargetNails[_currentStep]}');
+    
     // Check if this nail is a target for the current step
     if (_stepTargetNails[_currentStep]?.contains(nailIndex) == true) {
+      print('DEBUG: Nail $nailIndex is a target for step $_currentStep');
+      
       // Special handling for step 2 (polish removal) - handled by swipe mechanic
       if (_currentStep == 2) {
+        print('DEBUG: Step 2 - polish removal handled by swipe');
         // Step 2 progress is handled by _onPolishRemovalProgress
         return;
       } else {
         // For other steps, check if the current tool is one of the required tools
         if (_stepRequiredTools[_currentStep]?.contains(tool.type) == true) {
+          print('DEBUG: Tool ${tool.type} is required for step $_currentStep - marking progress');
           setState(() {
             _stepProgress[_currentStep]?.add(nailIndex);
           });
@@ -170,8 +179,12 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
           if (_isStepCompleted(_currentStep)) {
             _advanceToNextStep();
           }
+        } else {
+          print('DEBUG: Tool ${tool.type} is NOT required for step $_currentStep');
         }
       }
+    } else {
+      print('DEBUG: Nail $nailIndex is NOT a target for step $_currentStep');
     }
   }
   
@@ -219,11 +232,14 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   bool _isStepCompleted(int step) {
     final targetNails = _stepTargetNails[step] ?? {};
     final completedNails = _stepProgress[step] ?? {};
-    return targetNails.every((nailIndex) => completedNails.contains(nailIndex));
+    final isCompleted = targetNails.every((nailIndex) => completedNails.contains(nailIndex));
+    print('DEBUG: Step $step completion check - target: $targetNails, completed: $completedNails, isCompleted: $isCompleted');
+    return isCompleted;
   }
   
   void _advanceToNextStep() {
     if (_currentStep < 11) {
+      print('DEBUG: Advancing from step $_currentStep to step ${_currentStep + 1}');
       setState(() {
         _currentStep++;
       });
