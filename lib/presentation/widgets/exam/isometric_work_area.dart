@@ -45,18 +45,18 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   // Tutorial system for practice mode
   int _currentStep = 1;
   Map<int, Set<int>> _stepProgress = {}; // step -> set of completed nail indices
-  Map<int, ToolType> _stepRequiredTool = {
-    1: ToolType.handSanitizer, // 손을(내손 -> 고객 손) 소독하세요
-    2: ToolType.remover,       // 폴리쉬 제거(소지->약지)
-    3: ToolType.nailFile,      // 네일파일로 모양 만들기
-    4: ToolType.sandingBlock,  // 샌딩블록으로 표면 정리
-    5: ToolType.fingerBowl,    // 핑거볼에 손 담그기
-    6: ToolType.cuticleOil,    // 큐티클 오일 발라주기
-    7: ToolType.cuticlePusher, // 큐티클 푸셔로 밀어올리기
-    8: ToolType.cuticleNipper, // 니퍼로 큐티클 제거
-    9: ToolType.disinfectantSpray, // 소독 스프레이 뿌리기
-    10: ToolType.sterilizedGauze,  // 멸균거즈로 오일 제거
-    11: ToolType.polishBrush,  // 컬러링 도포
+  Map<int, Set<ToolType>> _stepRequiredTools = {
+    1: {ToolType.handSanitizer}, // 손을(내손 -> 고객 손) 소독하세요
+    2: {ToolType.remover, ToolType.cottonPad}, // 폴리쉬 제거(소지->약지)
+    3: {ToolType.nailFile},      // 네일파일로 모양 만들기
+    4: {ToolType.sandingBlock},  // 샌딩블록으로 표면 정리
+    5: {ToolType.fingerBowl},    // 핑거볼에 손 담그기
+    6: {ToolType.cuticleOil},    // 큐티클 오일 발라주기
+    7: {ToolType.cuticlePusher}, // 큐티클 푸셔로 밀어올리기
+    8: {ToolType.cuticleNipper}, // 니퍼로 큐티클 제거
+    9: {ToolType.disinfectantSpray}, // 소독 스프레이 뿌리기
+    10: {ToolType.cottonPad},  // 코튼패드로 오일 제거
+    11: {ToolType.polishBrush},  // 컬러링 도포
   };
   
   Map<int, Set<int>> _stepTargetNails = {
@@ -88,13 +88,13 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
       curve: Curves.easeOut,
     ));
     
-    // Initialize nail states
+    // Initialize nail states with red polish by default
     _nailStates = List.generate(5, (index) => NailState(
       fingerIndex: index,
       hasCuticle: true,
-      hasPolish: false,
+      hasPolish: true,  // Start with polish applied
       polishColor: Colors.red,
-      polishCoverage: 0.0,
+      polishCoverage: 1.0,  // Full coverage
       needsFiling: true,
       condition: NailCondition.clean,
     ));
@@ -152,8 +152,8 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   }
   
   void _handleStepProgress(Tool tool, int nailIndex) {
-    // Check if the current tool matches the required tool for current step
-    if (_stepRequiredTool[_currentStep] == tool.type) {
+    // Check if the current tool is one of the required tools for current step
+    if (_stepRequiredTools[_currentStep]?.contains(tool.type) == true) {
       // Check if this nail is a target for the current step
       if (_stepTargetNails[_currentStep]?.contains(nailIndex) == true) {
         setState(() {
@@ -186,6 +186,8 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   int getCurrentStep() => _currentStep;
   
   Map<int, Set<int>> getStepProgress() => Map.from(_stepProgress);
+  
+  Set<ToolType>? getCurrentStepRequiredTools() => _stepRequiredTools[_currentStep];
 
   @override
   Widget build(BuildContext context) {

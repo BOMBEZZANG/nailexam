@@ -99,7 +99,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
     '큐티클 푸셔로 밀어올리기',
     '니퍼로 큐티클 제거',
     '소독 스프레이 뿌리기',
-    '멸균거즈로 오일 제거',
+    '코튼패드로 오일 제거',
     '컬러링 도포',
   ];
 
@@ -659,9 +659,16 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   }
 
   Widget _buildToolTray() {
+    // Get highlighted tools from work area if in practice mode
+    Set<ToolType>? highlightedTools;
+    if (widget.isPracticeMode && _workAreaKey.currentState != null) {
+      highlightedTools = _workAreaKey.currentState!.getCurrentStepRequiredTools();
+    }
+    
     return ToolTray(
       selectedTool: _selectedTool,
       selectedTools: _selectedTools,
+      highlightedTools: highlightedTools,
       onToolSelected: (tool) {
         setState(() {
           _selectedTool = tool;
