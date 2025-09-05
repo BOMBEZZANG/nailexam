@@ -212,6 +212,26 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
     });
   }
   
+  void _onNailFilingProgress(int nailIndex, double progress) {
+    if (_currentStep != 3) return;
+    if (_stepTargetNails[3]?.contains(nailIndex) != true) return;
+    
+    setState(() {
+      // Update nail state when fully filed
+      if (progress >= 1.0 && _nailStates[nailIndex].needsFiling) {
+        _nailStates[nailIndex] = _nailStates[nailIndex].copyWith(
+          needsFiling: false,
+        );
+        _stepProgress[_currentStep]?.add(nailIndex);
+        
+        // Check if current step is completed
+        if (_isStepCompleted(_currentStep)) {
+          _advanceToNextStep();
+        }
+      }
+    });
+  }
+  
   bool _hasRequiredToolsForStep2() {
     // Check if both remover and cotton pad are selected
     if (widget.selectedTools == null) return false;
@@ -317,6 +337,8 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
                     onNailTap: _onNailTapped,
                     isPolishRemovalMode: widget.isPracticeMode && _currentStep == 2,
                     onPolishRemovalProgress: _onPolishRemovalProgress,
+                    isNailFilingMode: widget.isPracticeMode && _currentStep == 3,
+                    onNailFilingProgress: _onNailFilingProgress,
                   ),
                 ),
               ),

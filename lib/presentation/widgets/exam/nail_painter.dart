@@ -22,6 +22,7 @@ class NailPainter extends CustomPainter {
   final double scale;
   final bool showGuides;
   final double polishOpacity;
+  final double filingProgress;
   
   NailPainter({
     required this.nailState,
@@ -30,6 +31,7 @@ class NailPainter extends CustomPainter {
     this.scale = 1.0,
     this.showGuides = false,
     this.polishOpacity = 1.0,
+    this.filingProgress = 0.0,
   });
 
   @override
@@ -52,7 +54,7 @@ class NailPainter extends CustomPainter {
     // Draw nail bed
     _drawNailBed(canvas, size, center);
     
-    // Draw nail plate with shape
+    // Draw nail plate with shape (modified by filing progress)
     _drawNailPlate(canvas, size, center);
     
     // Draw cuticle area
@@ -149,9 +151,16 @@ class NailPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     
     final nailRect = _getNailRect(size, center);
-    final nailPath = _getNailPath(nailRect, nailShape);
+    // Modify nail shape based on filing progress
+    final modifiedShape = _getModifiedNailShape(nailShape, filingProgress);
+    final nailPath = _getNailPath(nailRect, modifiedShape);
     
     canvas.drawPath(nailPath, nailPlatePaint);
+    
+    // Draw filing marks if in progress
+    if (filingProgress > 0 && filingProgress < 1.0) {
+      _drawFilingMarks(canvas, nailRect, modifiedShape);
+    }
     
     // Add nail shine/highlight
     final highlightPaint = Paint()
@@ -373,7 +382,47 @@ class NailPainter extends CustomPainter {
            oldDelegate.viewType != viewType ||
            oldDelegate.scale != scale ||
            oldDelegate.showGuides != showGuides ||
-           oldDelegate.polishOpacity != polishOpacity;
+           oldDelegate.polishOpacity != polishOpacity ||
+           oldDelegate.filingProgress != filingProgress;
+  }
+  
+  NailShape _getModifiedNailShape(NailShape originalShape, double progress) {
+    // Special handling for thumb (square) nail - transform to circle when filed
+    if (originalShape == NailShape.square) {
+      if (progress < 0.3) {
+        return NailShape.square; // Start as square
+      } else if (progress < 0.7) {
+        return NailShape.squoval; // Semi-filed
+      } else {
+        return NailShape.round; // Final result: circle shape
+      }
+    }
+    
+    // For other nail shapes, gradually refine them
+    if (progress < 0.3) {
+      return originalShape; // Rough shape
+    } else if (progress < 0.7) {
+      return NailShape.squoval; // Semi-refined
+    } else {
+      return NailShape.oval; // Well-filed (oval for non-thumb nails)
+    }
+  }
+  
+  void _drawFilingMarks(Canvas canvas, Rect nailRect, NailShape shape) {
+    final markPaint = Paint()
+      ..color = const Color(0xFFD4C5B0).withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    
+    // Draw subtle filing texture marks
+    for (int i = 0; i < 5; i++) {
+      final y = nailRect.top + (i * nailRect.height / 5);
+      canvas.drawLine(
+        Offset(nailRect.left + 2, y),
+        Offset(nailRect.right - 2, y),
+        markPaint,
+      );
+    }
   }
 }
 

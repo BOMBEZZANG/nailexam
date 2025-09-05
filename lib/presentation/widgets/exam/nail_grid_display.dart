@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import '../../../data/models/nail_state.dart';
 import 'nail_painter.dart';
@@ -11,6 +12,8 @@ class NailGridDisplay extends StatelessWidget {
   final double scale;
   final Function(int nailIndex, double progress)? onPolishRemovalProgress;
   final bool isPolishRemovalMode;
+  final Function(int nailIndex, double progress)? onNailFilingProgress;
+  final bool isNailFilingMode;
   
   const NailGridDisplay({
     super.key,
@@ -21,6 +24,8 @@ class NailGridDisplay extends StatelessWidget {
     this.scale = 1.0,
     this.onPolishRemovalProgress,
     this.isPolishRemovalMode = false,
+    this.onNailFilingProgress,
+    this.isNailFilingMode = false,
   });
 
   @override
@@ -128,6 +133,8 @@ class NailGridDisplay extends StatelessWidget {
                   onTap: (localPosition) => onNailTap?.call(index, localPosition),
                   onPolishRemovalProgress: onPolishRemovalProgress,
                   isPolishRemovalMode: isPolishRemovalMode,
+                  onNailFilingProgress: onNailFilingProgress,
+                  isNailFilingMode: isNailFilingMode,
                 ),
               ),
             ),
@@ -181,6 +188,8 @@ class SingleNailWidget extends StatefulWidget {
   final Function(Offset localPosition)? onTap;
   final Function(int nailIndex, double progress)? onPolishRemovalProgress;
   final bool isPolishRemovalMode;
+  final Function(int nailIndex, double progress)? onNailFilingProgress;
+  final bool isNailFilingMode;
   
   const SingleNailWidget({
     super.key,
@@ -192,6 +201,8 @@ class SingleNailWidget extends StatefulWidget {
     this.onTap,
     this.onPolishRemovalProgress,
     this.isPolishRemovalMode = false,
+    this.onNailFilingProgress,
+    this.isNailFilingMode = false,
   });
 
   @override
@@ -214,6 +225,12 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
   Offset? _lastSwipePosition;
   List<PolishParticle> _particles = [];
   late AnimationController _particleController;
+  
+  // Nail filing mechanics
+  double _filingProgress = 0.0;
+  List<Offset> _filingStrokes = [];
+  List<FilingDustParticle> _dustParticles = [];
+  bool _isValidFilingDirection = false;
 
   @override
   void initState() {
@@ -253,6 +270,9 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
     
     // Initialize polish removal progress based on nail state
     _polishRemovalProgress = widget.nailState.hasPolish ? 0.0 : 1.0;
+    
+    // Initialize nail filing progress
+    _filingProgress = widget.nailState.needsFiling ? 0.0 : 1.0;
   }
   
   @override
@@ -288,7 +308,7 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
     return LayoutBuilder(
       builder: (context, constraints) {
         return GestureDetector(
-          onTapDown: widget.isPolishRemovalMode ? null : (details) {
+          onTapDown: (widget.isPolishRemovalMode || widget.isNailFilingMode) ? null : (details) {
             // Check if tap is within nail boundaries
             if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
               _triggerEffects(details.localPosition);
@@ -299,14 +319,24 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
             if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
               _startPolishRemoval(details.localPosition);
             }
+          } : widget.isNailFilingMode ? (details) {
+            if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
+              _startNailFiling(details.localPosition);
+            }
           } : null,
           onPanUpdate: widget.isPolishRemovalMode ? (details) {
             if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
               _updatePolishRemoval(details.localPosition, constraints.biggest);
             }
+          } : widget.isNailFilingMode ? (details) {
+            if (_isWithinNailBounds(details.localPosition, constraints.biggest)) {
+              _updateNailFiling(details.localPosition, constraints.biggest);
+            }
           } : null,
           onPanEnd: widget.isPolishRemovalMode ? (details) {
             _endPolishRemoval();
+          } : widget.isNailFilingMode ? (details) {
+            _endNailFiling();
           } : null,
           child: AnimatedBuilder(
             animation: Listenable.merge([_rippleAnimation, _flashAnimation]),
@@ -337,6 +367,7 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
                         scale: widget.scale,
                         showGuides: widget.isPracticeMode && widget.isSelected,
                         polishOpacity: widget.nailState.hasPolish ? 1.0 - _polishRemovalProgress : 0.0,
+                        filingProgress: _filingProgress,
                       ),
                     ),
                   ),
@@ -443,6 +474,74 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
                         ),
                       ),
                     ),
+                  
+                  // Filing dust particles
+                  if (_dustParticles.isNotEmpty)
+                    ...List.generate(_dustParticles.length, (index) {
+                      final particle = _dustParticles[index];
+                      return AnimatedBuilder(
+                        animation: _particleController,
+                        builder: (context, child) {
+                          final progress = (DateTime.now().millisecondsSinceEpoch - particle.createdAt) / 1000.0;
+                          if (progress > 1.0) {
+                            return const SizedBox.shrink();
+                          }
+                          
+                          final opacity = 1.0 - progress;
+                          final dx = particle.position.dx + (particle.velocityX * progress);
+                          final dy = particle.position.dy + (particle.velocityY * progress);
+                          
+                          return Positioned(
+                            left: dx - 3,
+                            top: dy - 3,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: particle.color.withOpacity(opacity * 0.7),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
+                  
+                  // Filing progress indicator
+                  if (widget.isNailFilingMode && _filingProgress > 0)
+                    Positioned(
+                      bottom: 8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.build,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${(_filingProgress * 100).toInt()}%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               );
             },
@@ -504,6 +603,91 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
       _swipePoints.clear();
       _lastSwipePosition = null;
     });
+  }
+  
+  // Nail filing methods
+  void _startNailFiling(Offset position) {
+    setState(() {
+      _filingStrokes.clear();
+      _filingStrokes.add(position);
+    });
+  }
+  
+  void _updateNailFiling(Offset position, Size widgetSize) {
+    if (_filingStrokes.isEmpty) return;
+    
+    final lastPosition = _filingStrokes.last;
+    final distance = (position - lastPosition).distance;
+    
+    // Only process if moved enough distance
+    if (distance > 5) {
+      final direction = _getFilingDirection(lastPosition, position, widgetSize);
+      _isValidFilingDirection = _isCorrectFilingDirection(direction);
+      
+      if (_isValidFilingDirection) {
+        // Vibration feedback
+        HapticFeedback.lightImpact();
+        
+        setState(() {
+          _filingStrokes.add(position);
+          if (_filingStrokes.length > 10) {
+            _filingStrokes.removeAt(0);
+          }
+          
+          // Increase filing progress
+          _filingProgress = (_filingProgress + 0.03).clamp(0.0, 1.0);
+          
+          // Create dust particles
+          if (_filingProgress < 1.0 && math.Random().nextDouble() > 0.4) {
+            final random = math.Random();
+            _dustParticles.add(FilingDustParticle(
+              position: position,
+              color: const Color(0xFFE8D5C4), // nail dust color
+              velocityX: (random.nextDouble() - 0.5) * 30,
+              velocityY: random.nextDouble() * -20 - 10,
+              createdAt: DateTime.now().millisecondsSinceEpoch,
+            ));
+          }
+          
+          // Clean old particles
+          final now = DateTime.now().millisecondsSinceEpoch;
+          _dustParticles.removeWhere((p) => now - p.createdAt > 1000);
+          
+          // Notify progress
+          widget.onNailFilingProgress?.call(widget.nailIndex, _filingProgress);
+        });
+      }
+    }
+  }
+  
+  void _endNailFiling() {
+    setState(() {
+      _filingStrokes.clear();
+      _isValidFilingDirection = false;
+    });
+  }
+  
+  String _getFilingDirection(Offset start, Offset end, Size widgetSize) {
+    final center = Offset(widgetSize.width / 2, widgetSize.height / 2);
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    
+    // Determine if swipe is toward center
+    if (start.dx < center.dx && dx > 0) {
+      return 'left-to-center';
+    } else if (start.dx > center.dx && dx < 0) {
+      return 'right-to-center';
+    } else if (start.dy < center.dy && dy > 0) {
+      return 'top-to-center';
+    } else if (start.dy > center.dy && dy < 0) {
+      return 'bottom-to-center';
+    }
+    
+    return 'invalid';
+  }
+  
+  bool _isCorrectFilingDirection(String direction) {
+    return direction != 'invalid';
   }
   
   bool _isWithinNailBounds(Offset tapPosition, Size widgetSize) {
@@ -657,6 +841,22 @@ class PolishParticle {
   PolishParticle({
     required this.position,
     required this.color,
+    required this.createdAt,
+  });
+}
+
+class FilingDustParticle {
+  final Offset position;
+  final Color color;
+  final double velocityX;
+  final double velocityY;
+  final int createdAt;
+  
+  FilingDustParticle({
+    required this.position,
+    required this.color,
+    required this.velocityX,
+    required this.velocityY,
     required this.createdAt,
   });
 }

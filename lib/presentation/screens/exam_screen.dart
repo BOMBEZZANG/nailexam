@@ -1021,6 +1021,13 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       });
     }
     
+    // Show special guide for step 3 (nail filing)
+    if (newStep == 3) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _feedbackController.showFeedback('가장자리에서 가운데로 문질러 주세요');
+      });
+    }
+    
     if (newStep > 11) {
       // All steps completed
       _showTutorialCompleteDialog();
