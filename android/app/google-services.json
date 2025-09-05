@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "359583839238",
+    "project_id": "nailexam-b26d8",
+    "storage_bucket": "nailexam-b26d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:359583839238:android:5707412f430be289e3ff87",
+        "android_client_info": {
+          "package_name": "com.example.nailexam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOzc1Nnrug8mLLoD_IAzV3tXFHaW7KOiw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

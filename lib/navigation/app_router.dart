@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../data/models/exam_session.dart';
+import '../presentation/screens/splash_screen.dart';
 import '../presentation/screens/home_screen.dart';
 import '../presentation/screens/exam_setup_screen.dart';
 import '../presentation/screens/exam_screen.dart';
 import '../presentation/screens/results_screen.dart';
 
 class AppRouter {
-  static const String home = '/';
+  static const String splash = '/';
+  static const String home = '/home';
   static const String examSetup = '/exam-setup';
   static const String exam = '/exam';
   static const String results = '/results';
@@ -15,6 +17,11 @@ class AppRouter {
   
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case splash:
+        return MaterialPageRoute(
+          builder: (_) => const SplashScreen(),
+        );
+        
       case home:
         return MaterialPageRoute(
           builder: (_) => const HomeScreen(),

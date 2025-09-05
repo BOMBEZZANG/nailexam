@@ -7,10 +7,7 @@ import '../../navigation/app_router.dart';
 class ResultsScreen extends StatelessWidget {
   final ExamSession session;
 
-  const ResultsScreen({
-    Key? key,
-    required this.session,
-  }) : super(key: key);
+  const ResultsScreen({super.key, required this.session});
 
   @override
   Widget build(BuildContext context) {
@@ -53,19 +50,16 @@ class ResultsScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              color.withOpacity(0.1),
-              color.withOpacity(0.05),
-            ],
+            colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
           ),
         ),
         child: Column(
           children: [
             Text(
               session.isPracticeMode ? 'Practice Complete!' : 'Exam Complete!',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -83,10 +77,8 @@ class ResultsScreen extends StatelessWidget {
                   children: [
                     Text(
                       '${score.toStringAsFixed(1)}%',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold, color: color),
                     ),
                     Text(
                       'Grade $grade',
@@ -113,7 +105,7 @@ class ResultsScreen extends StatelessWidget {
 
   Widget _buildOverviewCard(BuildContext context) {
     final duration = session.elapsedTime;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
@@ -122,9 +114,9 @@ class ResultsScreen extends StatelessWidget {
           children: [
             Text(
               'Session Overview',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Row(
@@ -182,23 +174,19 @@ class ResultsScreen extends StatelessWidget {
   ) {
     return Column(
       children: [
-        Icon(
-          icon,
-          color: Theme.of(context).primaryColor,
-          size: 24,
-        ),
+        Icon(icon, color: Theme.of(context).primaryColor, size: 24),
         const SizedBox(height: 4),
         Text(
           value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
         ),
       ],
     );
@@ -207,19 +195,19 @@ class ResultsScreen extends StatelessWidget {
   Widget _buildPerformanceBreakdown(BuildContext context) {
     // Calculate average scores for breakdown
     final avgScores = <String, double>{};
-    ExamConstants.scoreWeights.keys.forEach((key) {
+    for (var key in ExamConstants.scoreWeights.keys) {
       double total = 0.0;
       int count = 0;
-      
-      session.periodResults.values.forEach((period) {
+
+      for (var period in session.periodResults.values) {
         if (period.scoreBreakdown.containsKey(key)) {
           total += period.scoreBreakdown[key]!;
           count++;
         }
-      });
-      
+      }
+
       avgScores[key] = count > 0 ? total / count : 0.0;
-    });
+    }
 
     return Card(
       child: Padding(
@@ -229,20 +217,22 @@ class ResultsScreen extends StatelessWidget {
           children: [
             Text(
               'Performance Breakdown',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            ...avgScores.entries.map((entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildScoreBar(
-                context,
-                _getCategoryName(entry.key),
-                entry.value,
-                ExamConstants.scoreWeights[entry.key]! * 100,
+            ...avgScores.entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildScoreBar(
+                  context,
+                  _getCategoryName(entry.key),
+                  entry.value,
+                  ExamConstants.scoreWeights[entry.key]! * 100,
+                ),
               ),
-            )),
+            ),
           ],
         ),
       ),
@@ -263,15 +253,15 @@ class ResultsScreen extends StatelessWidget {
           children: [
             Text(
               '$label (${weight.toInt()}%)',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
             Text(
               '${score.toStringAsFixed(1)}%',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -279,9 +269,7 @@ class ResultsScreen extends StatelessWidget {
         LinearProgressIndicator(
           value: score / 100,
           backgroundColor: Colors.grey[300],
-          valueColor: AlwaysStoppedAnimation<Color>(
-            _getScoreColor(score),
-          ),
+          valueColor: AlwaysStoppedAnimation<Color>(_getScoreColor(score)),
         ),
       ],
     );
@@ -296,9 +284,9 @@ class ResultsScreen extends StatelessWidget {
           children: [
             Text(
               'Period Results',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             ...session.periodResults.entries.map((entry) {
@@ -317,11 +305,13 @@ class ResultsScreen extends StatelessWidget {
                     ),
                   ),
                   title: Text(
-                    ExamConstants.periodNames[period.periodNumber] ?? 'Period ${period.periodNumber}',
+                    ExamConstants.periodNames[period.periodNumber] ??
+                        'Period ${period.periodNumber}',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   subtitle: Text(
-                    ExamConstants.techniqueDisplayNames[period.assignedTechnique] ?? 
+                    ExamConstants.techniqueDisplayNames[period
+                            .assignedTechnique] ??
                         period.assignedTechnique,
                   ),
                   trailing: Column(
@@ -330,9 +320,8 @@ class ResultsScreen extends StatelessWidget {
                     children: [
                       Text(
                         '${period.score.toStringAsFixed(1)}%',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       if (period.duration != null)
                         Text(
@@ -411,7 +400,8 @@ class ResultsScreen extends StatelessWidget {
   }
 
   String _getScoreMessage(double score) {
-    if (score >= 90) return 'Excellent performance! You\'re ready for the real exam.';
+    if (score >= 90)
+      return 'Excellent performance! You\'re ready for the real exam.';
     if (score >= 80) return 'Good job! Keep practicing to improve further.';
     if (score >= 70) return 'Not bad, but there\'s room for improvement.';
     if (score >= 60) return 'You need more practice to pass the exam.';
@@ -420,11 +410,16 @@ class ResultsScreen extends StatelessWidget {
 
   String _getCategoryName(String key) {
     switch (key) {
-      case 'sequence': return 'Sequence Accuracy';
-      case 'timing': return 'Time Management';
-      case 'hygiene': return 'Hygiene Protocol';
-      case 'technique': return 'Technique Quality';
-      default: return key;
+      case 'sequence':
+        return 'Sequence Accuracy';
+      case 'timing':
+        return 'Time Management';
+      case 'hygiene':
+        return 'Hygiene Protocol';
+      case 'technique':
+        return 'Technique Quality';
+      default:
+        return key;
     }
   }
 
@@ -432,7 +427,7 @@ class ResultsScreen extends StatelessWidget {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     } else {
@@ -445,11 +440,7 @@ class ResultsScreen extends StatelessWidget {
   }
 
   void _goHome(BuildContext context) {
-    AppRouter.navigateAndRemoveUntil(
-      context,
-      AppRouter.home,
-      (route) => false,
-    );
+    AppRouter.navigateAndRemoveUntil(context, AppRouter.home, (route) => false);
   }
 
   void _startAgain(BuildContext context, bool isPracticeMode) {

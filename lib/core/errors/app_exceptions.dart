@@ -1,25 +1,26 @@
 class AppException implements Exception {
   final String message;
   final String? code;
-  
+
   AppException(this.message, {this.code});
-  
+
   @override
-  String toString() => 'AppException: $message${code != null ? ' (Code: $code)' : ''}';
+  String toString() =>
+      'AppException: $message${code != null ? ' (Code: $code)' : ''}';
 }
 
 class SessionException extends AppException {
-  SessionException(String message, {String? code}) : super(message, code: code);
+  SessionException(super.message, {super.code});
 }
 
 class StorageException extends AppException {
-  StorageException(String message, {String? code}) : super(message, code: code);
+  StorageException(super.message, {super.code});
 }
 
 class ValidationException extends AppException {
-  ValidationException(String message, {String? code}) : super(message, code: code);
+  ValidationException(super.message, {super.code});
 }
 
 class TimerException extends AppException {
-  TimerException(String message, {String? code}) : super(message, code: code);
+  TimerException(super.message, {super.code});
 }

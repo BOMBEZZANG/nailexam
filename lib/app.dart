@@ -3,7 +3,7 @@ import 'core/constants/app_constants.dart';
 import 'navigation/app_router.dart';
 
 class NailExamApp extends StatelessWidget {
-  const NailExamApp({Key? key}) : super(key: key);
+  const NailExamApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,10 +14,7 @@ class NailExamApp extends StatelessWidget {
         primarySwatch: Colors.pink,
         visualDensity: VisualDensity.adaptivePlatformDensity,
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
+        appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
         cardTheme: const CardThemeData(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -29,10 +26,7 @@ class NailExamApp extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.defaultRadius),
             ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 12,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
@@ -40,10 +34,7 @@ class NailExamApp extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.defaultRadius),
             ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 12,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
@@ -57,7 +48,7 @@ class NailExamApp extends StatelessWidget {
         ),
       ),
       onGenerateRoute: AppRouter.generateRoute,
-      initialRoute: AppRouter.home,
+      initialRoute: AppRouter.splash,
     );
   }
 }

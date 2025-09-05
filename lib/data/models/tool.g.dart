@@ -34,4 +34,8 @@ const _$ToolTypeEnumMap = {
   ToolType.cuticleNipper: 'cuticleNipper',
   ToolType.uvLamp: 'uvLamp',
   ToolType.remover: 'remover',
+  ToolType.handSanitizer: 'handSanitizer',
+  ToolType.sandingBlock: 'sandingBlock',
+  ToolType.fingerBowl: 'fingerBowl',
+  ToolType.cuticleOil: 'cuticleOil',
 };

@@ -6,10 +6,7 @@ import '../../navigation/app_router.dart';
 class ExamSetupScreen extends StatefulWidget {
   final bool isPracticeMode;
 
-  const ExamSetupScreen({
-    Key? key,
-    required this.isPracticeMode,
-  }) : super(key: key);
+  const ExamSetupScreen({super.key, required this.isPracticeMode});
 
   @override
   State<ExamSetupScreen> createState() => _ExamSetupScreenState();
@@ -50,8 +47,8 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
 
   Widget _buildModeCard() {
     return Card(
-      color: widget.isPracticeMode 
-          ? Colors.blue.shade50 
+      color: widget.isPracticeMode
+          ? Colors.blue.shade50
           : Colors.orange.shade50,
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
@@ -60,8 +57,8 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
             Icon(
               widget.isPracticeMode ? Icons.school : Icons.quiz,
               size: 48,
-              color: widget.isPracticeMode 
-                  ? Colors.blue.shade600 
+              color: widget.isPracticeMode
+                  ? Colors.blue.shade600
                   : Colors.orange.shade600,
             ),
             const SizedBox(height: 12),
@@ -69,8 +66,8 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
               widget.isPracticeMode ? 'Practice Mode' : 'Exam Mode',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: widget.isPracticeMode 
-                    ? Colors.blue.shade700 
+                color: widget.isPracticeMode
+                    ? Colors.blue.shade700
                     : Colors.orange.shade700,
               ),
             ),
@@ -97,9 +94,9 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
           children: [
             Text(
               'Exam Structure',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             _buildInfoRow(
@@ -124,13 +121,13 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
             const SizedBox(height: 8),
             Text(
               'Periods Overview:',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            ...ExamConstants.periodNames.entries.map((entry) =>
-              Padding(
+            ...ExamConstants.periodNames.entries.map(
+              (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   '${entry.key}. ${entry.value}',
@@ -147,23 +144,16 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: Theme.of(context).primaryColor,
-        ),
+        Icon(icon, size: 20, color: Theme.of(context).primaryColor),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
         ),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -178,9 +168,9 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
           children: [
             Text(
               'Settings',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             SwitchListTile(
@@ -232,10 +222,7 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Colors.amber.shade700,
-                ),
+                Icon(Icons.info_outline, color: Colors.amber.shade700),
                 const SizedBox(width: 8),
                 Text(
                   'Instructions',
@@ -250,13 +237,13 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
             Text(
               widget.isPracticeMode
                   ? '• Take your time to learn each technique\n'
-                    '• Use pause feature if needed\n'
-                    '• Review feedback after each period\n'
-                    '• Focus on proper sequence and hygiene'
+                        '• Use pause feature if needed\n'
+                        '• Review feedback after each period\n'
+                        '• Focus on proper sequence and hygiene'
                   : '• Complete all 5 periods within time limits\n'
-                    '• Follow proper technique sequences\n'
-                    '• Maintain hygiene protocols\n'
-                    '• No pausing allowed during exam',
+                        '• Follow proper technique sequences\n'
+                        '• Maintain hygiene protocols\n'
+                        '• No pausing allowed during exam',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -275,8 +262,8 @@ class _ExamSetupScreenState extends State<ExamSetupScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppConstants.defaultRadius),
         ),
-        backgroundColor: widget.isPracticeMode 
-            ? Colors.blue.shade600 
+        backgroundColor: widget.isPracticeMode
+            ? Colors.blue.shade600
             : Colors.orange.shade600,
         foregroundColor: Colors.white,
       ),

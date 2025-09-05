@@ -12,6 +12,12 @@ enum ToolType {
   cuticleNipper,
   uvLamp,
   remover,
+  handSanitizer,
+  sandingBlock,
+  fingerBowl,
+  cuticleOil,
+  disinfectantSpray,
+  sterilizedGauze,
 }
 
 @JsonSerializable()
@@ -44,6 +50,13 @@ class Tool {
   static List<Tool> getDefaultTools() {
     return [
       Tool(
+        id: 'hand_sanitizer',
+        name: '손소독제',
+        type: ToolType.handSanitizer,
+        iconPath: 'assets/tools/hand_sanitizer.png',
+        isConsumable: true,
+      ),
+      Tool(
         id: 'nail_file',
         name: 'Nail File',
         type: ToolType.nailFile,
@@ -57,7 +70,7 @@ class Tool {
       ),
       Tool(
         id: 'cuticle_pusher',
-        name: 'Cuticle Pusher',
+        name: '큐티클 푸셔',
         type: ToolType.cuticlePusher,
         iconPath: 'assets/tools/cuticle_pusher.png',
       ),
@@ -86,6 +99,46 @@ class Tool {
         name: 'Cuticle Nipper',
         type: ToolType.cuticleNipper,
         iconPath: 'assets/tools/cuticle_nipper.png',
+      ),
+      Tool(
+        id: 'remover',
+        name: 'Polish Remover',
+        type: ToolType.remover,
+        iconPath: 'assets/tools/remover.png',
+        isConsumable: true,
+      ),
+      Tool(
+        id: 'sanding_block',
+        name: 'Sanding Block',
+        type: ToolType.sandingBlock,
+        iconPath: 'assets/tools/sanding_block.png',
+      ),
+      Tool(
+        id: 'finger_bowl',
+        name: '핑거볼',
+        type: ToolType.fingerBowl,
+        iconPath: 'assets/tools/finger_bowl.png',
+      ),
+      Tool(
+        id: 'cuticle_oil',
+        name: '큐티클 오일',
+        type: ToolType.cuticleOil,
+        iconPath: 'assets/tools/cuticle_oil.png',
+        isConsumable: true,
+      ),
+      Tool(
+        id: 'disinfectant_spray',
+        name: '소독제 스프레이',
+        type: ToolType.disinfectantSpray,
+        iconPath: 'assets/tools/disinfectant_spray.png',
+        isConsumable: true,
+      ),
+      Tool(
+        id: 'sterilized_gauze',
+        name: '멸균 거즈',
+        type: ToolType.sterilizedGauze,
+        iconPath: 'assets/tools/sterilized_gauze.png',
+        isConsumable: true,
       ),
     ];
   }

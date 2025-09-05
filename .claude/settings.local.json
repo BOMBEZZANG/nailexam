@@ -3,7 +3,11 @@
     "allow": [
       "Bash(flutter pub:*)",
       "Bash(dart run:*)",
-      "Bash(flutter packages pub run:*)"
+      "Bash(flutter packages pub run:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(dart analyze:*)",
+      "Bash(flutter run:*)",
+      "Bash(/mnt/c/flutter/flutter/bin/flutter:*)"
     ],
     "deny": [],
     "ask": []
