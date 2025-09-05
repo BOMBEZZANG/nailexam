@@ -7,6 +7,7 @@ import '../../data/models/tool.dart';
 import '../../data/models/exam_progress.dart';
 import '../../navigation/app_router.dart';
 import '../widgets/common/loading_indicator.dart';
+import '../widgets/common/banner_ad_widget.dart';
 import '../widgets/exam/isometric_work_area.dart';
 import '../widgets/exam/tool_tray.dart';
 import '../widgets/exam/color_palette.dart';
@@ -1052,47 +1053,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   }
   
   Widget _buildBannerAdsSection() {
-    return Container(
-      width: double.infinity,
-      height: 60, // Standard banner ad height
-      color: Colors.grey[100],
-      child: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[300]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.ads_click,
-                color: Colors.grey[400],
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Banner Advertisement',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return const BannerAdWidget();
   }
 
   @override

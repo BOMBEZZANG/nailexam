@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../core/utils/logger.dart';
@@ -13,20 +14,25 @@ class AdManager {
   bool _isShowingAd = false;
   DateTime? _appOpenLoadTime;
   DateTime? _rewardedAdLoadTime;
+  bool _isInitialized = false;
 
   // Test Ad Unit IDs (for development)
   static const String _appOpenAdUnitId =
       'ca-app-pub-3940256099942544/9257395921';
   static const String _rewardedAdUnitId =
       'ca-app-pub-3940256099942544/5224354917';
-
-  // Production Ad Unit IDs (replace with your actual ad unit IDs when ready)
-  // static const String _appOpenAdUnitId = Platform.isAndroid
-  //     ? 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'
-  //     : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy';
+  static const String _bannerAdUnitId =
+      'ca-app-pub-3940256099942544/2435281174';
 
   Future<void> initialize() async {
+    if (_isInitialized) {
+      Logger.i('AdMob already initialized');
+      return;
+    }
+
     try {
+      Logger.i('Starting AdMob initialization...');
+      
       // Request configuration for test ads
       final RequestConfiguration requestConfiguration = RequestConfiguration(
         testDeviceIds: ['6F0BB9EE24AB32A40AFF36E6E62333D4'], // From logs
@@ -34,36 +40,40 @@ class AdManager {
       MobileAds.instance.updateRequestConfiguration(requestConfiguration);
       
       await MobileAds.instance.initialize();
+      _isInitialized = true;
       Logger.i('AdMob initialized successfully');
       
-      // Try multiple times with increasing delays for WebView readiness
-      await _loadAppOpenAdWithRetry();
-      await _loadRewardedAdWithRetry();
+      // 광고 로딩을 비동기로 시작 (빠른 초기화를 위해)
+      _loadAppOpenAdAsync();
+      _loadRewardedAdAsync();
+      
     } catch (e) {
       Logger.e('Failed to initialize AdMob', error: e);
+      _isInitialized = false;
     }
   }
 
-  Future<void> _loadAppOpenAdWithRetry() async {
+  // 앱 오픈 광고를 비동기로 로딩 (재시도 로직 간소화)
+  Future<void> _loadAppOpenAdAsync() async {
     int attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 2; // 재시도 횟수 감소
     
-    while (attempts < maxAttempts && _appOpenAd == null) {
+    while (attempts < maxAttempts && _appOpenAd == null && _isInitialized) {
       attempts++;
-      final delay = Duration(seconds: 2 * attempts); // 2s, 4s, 6s
-      Logger.i('Attempting to load ad (attempt $attempts/$maxAttempts) after ${delay.inSeconds}s delay');
+      final delay = Duration(milliseconds: 500 * attempts); // 0.5s, 1s로 단축
       
-      await Future.delayed(delay);
-      _loadAppOpenAd();
+      if (attempts > 1) {
+        Logger.i('Retrying app open ad load (attempt $attempts/$maxAttempts) after ${delay.inMilliseconds}ms delay');
+        await Future.delayed(delay);
+      } else {
+        Logger.i('Loading app open ad (attempt $attempts/$maxAttempts)');
+      }
       
-      // Wait to see if ad loads successfully
-      await Future.delayed(const Duration(seconds: 3));
+      await _loadAppOpenAd();
       
       if (_appOpenAd != null) {
-        Logger.i('Ad loaded successfully on attempt $attempts');
+        Logger.i('App open ad loaded successfully on attempt $attempts');
         break;
-      } else {
-        Logger.w('Ad failed to load on attempt $attempts');
       }
     }
     
@@ -72,26 +82,27 @@ class AdManager {
     }
   }
 
-  Future<void> _loadRewardedAdWithRetry() async {
+  // 리워드 광고를 비동기로 로딩 (재시도 로직 간소화)
+  Future<void> _loadRewardedAdAsync() async {
     int attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 2; // 재시도 횟수 감소
     
-    while (attempts < maxAttempts && _rewardedAd == null) {
+    while (attempts < maxAttempts && _rewardedAd == null && _isInitialized) {
       attempts++;
-      final delay = Duration(seconds: 2 * attempts);
-      Logger.i('Attempting to load rewarded ad (attempt $attempts/$maxAttempts) after ${delay.inSeconds}s delay');
+      final delay = Duration(milliseconds: 500 * attempts); // 0.5s, 1s로 단축
       
-      await Future.delayed(delay);
-      _loadRewardedAd();
+      if (attempts > 1) {
+        Logger.i('Retrying rewarded ad load (attempt $attempts/$maxAttempts) after ${delay.inMilliseconds}ms delay');
+        await Future.delayed(delay);
+      } else {
+        Logger.i('Loading rewarded ad (attempt $attempts/$maxAttempts)');
+      }
       
-      // Wait to see if ad loads successfully
-      await Future.delayed(const Duration(seconds: 3));
+      await _loadRewardedAd();
       
       if (_rewardedAd != null) {
         Logger.i('Rewarded ad loaded successfully on attempt $attempts');
         break;
-      } else {
-        Logger.w('Rewarded ad failed to load on attempt $attempts');
       }
     }
     
@@ -100,22 +111,38 @@ class AdManager {
     }
   }
 
-  void _loadAppOpenAd() {
-    AppOpenAd.load(
-      adUnitId: _appOpenAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: AppOpenAdLoadCallback(
-        onAdLoaded: (ad) {
-          Logger.i('App open ad loaded successfully');
-          _appOpenLoadTime = DateTime.now();
-          _appOpenAd = ad;
+  Future<void> _loadAppOpenAd() async {
+    try {
+      final completer = Completer<void>();
+      
+      AppOpenAd.load(
+        adUnitId: _appOpenAdUnitId,
+        request: const AdRequest(),
+        adLoadCallback: AppOpenAdLoadCallback(
+          onAdLoaded: (ad) {
+            Logger.i('App open ad loaded successfully');
+            _appOpenLoadTime = DateTime.now();
+            _appOpenAd = ad;
+            completer.complete();
+          },
+          onAdFailedToLoad: (error) {
+            Logger.e('Failed to load app open ad: ${error.message} (Code: ${error.code})');
+            _appOpenAd = null;
+            completer.complete();
+          },
+        ),
+      );
+      
+      // 최대 2초 대기 (무한 대기 방지)
+      await completer.future.timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          Logger.w('App open ad loading timed out');
         },
-        onAdFailedToLoad: (error) {
-          Logger.e('Failed to load app open ad: ${error.message} (Code: ${error.code})');
-          _appOpenAd = null;
-        },
-      ),
-    );
+      );
+    } catch (e) {
+      Logger.e('Error loading app open ad', error: e);
+    }
   }
 
   bool get isAdAvailable {
@@ -149,7 +176,7 @@ class AdManager {
         _isShowingAd = false;
         ad.dispose();
         _appOpenAd = null;
-        _loadAppOpenAd(); // Load a new ad
+        _loadAppOpenAdAsync(); // 새 광고 로딩
         onAdFailedToShow?.call();
       },
       onAdDismissedFullScreenContent: (ad) {
@@ -157,7 +184,7 @@ class AdManager {
         _isShowingAd = false;
         ad.dispose();
         _appOpenAd = null;
-        _loadAppOpenAd(); // Load a new ad
+        _loadAppOpenAdAsync(); // 새 광고 로딩
         onAdDismissed?.call();
       },
     );
@@ -171,22 +198,38 @@ class AdManager {
     }
   }
 
-  void _loadRewardedAd() {
-    RewardedAd.load(
-      adUnitId: _rewardedAdUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          Logger.i('Rewarded ad loaded successfully');
-          _rewardedAdLoadTime = DateTime.now();
-          _rewardedAd = ad;
+  Future<void> _loadRewardedAd() async {
+    try {
+      final completer = Completer<void>();
+      
+      RewardedAd.load(
+        adUnitId: _rewardedAdUnitId,
+        request: const AdRequest(),
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (ad) {
+            Logger.i('Rewarded ad loaded successfully');
+            _rewardedAdLoadTime = DateTime.now();
+            _rewardedAd = ad;
+            completer.complete();
+          },
+          onAdFailedToLoad: (error) {
+            Logger.e('Failed to load rewarded ad: ${error.message} (Code: ${error.code})');
+            _rewardedAd = null;
+            completer.complete();
+          },
+        ),
+      );
+      
+      // 최대 2초 대기 (무한 대기 방지)
+      await completer.future.timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          Logger.w('Rewarded ad loading timed out');
         },
-        onAdFailedToLoad: (error) {
-          Logger.e('Failed to load rewarded ad: ${error.message} (Code: ${error.code})');
-          _rewardedAd = null;
-        },
-      ),
-    );
+      );
+    } catch (e) {
+      Logger.e('Error loading rewarded ad', error: e);
+    }
   }
 
   bool get isRewardedAdAvailable {
@@ -221,7 +264,7 @@ class AdManager {
         _isShowingAd = false;
         ad.dispose();
         _rewardedAd = null;
-        _loadRewardedAd(); // Load a new ad
+        _loadRewardedAdAsync(); // 새 광고 로딩
         onAdFailedToShow?.call();
       },
       onAdDismissedFullScreenContent: (ad) {
@@ -229,16 +272,18 @@ class AdManager {
         _isShowingAd = false;
         ad.dispose();
         _rewardedAd = null;
-        _loadRewardedAd(); // Load a new ad
+        _loadRewardedAdAsync(); // 새 광고 로딩
         onAdDismissed?.call();
       },
     );
 
     try {
-      await _rewardedAd!.show(onUserEarnedReward: (ad, reward) {
-        Logger.i('User earned reward: ${reward.amount} ${reward.type}');
-        onUserEarnedReward?.call();
-      });
+      await _rewardedAd!.show(
+        onUserEarnedReward: (ad, reward) {
+          Logger.i('User earned reward: ${reward.amount} ${reward.type}');
+          onUserEarnedReward?.call();
+        },
+      );
     } catch (e) {
       Logger.e('Error showing rewarded ad', error: e);
       _isShowingAd = false;
@@ -248,8 +293,42 @@ class AdManager {
 
   void dispose() {
     _appOpenAd?.dispose();
-    _appOpenAd = null;
     _rewardedAd?.dispose();
+    _appOpenAd = null;
     _rewardedAd = null;
+    _isInitialized = false;
   }
+  
+  // Banner ad creation helper
+  BannerAd createBannerAd({
+    required AdSize size,
+    void Function(Ad ad)? onAdLoaded,
+    void Function(Ad ad, LoadAdError error)? onAdFailedToLoad,
+  }) {
+    return BannerAd(
+      adUnitId: _bannerAdUnitId,
+      size: size,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          Logger.i('Banner ad loaded successfully');
+          onAdLoaded?.call(ad);
+        },
+        onAdFailedToLoad: (ad, error) {
+          Logger.e('Banner ad failed to load: ${error.message}');
+          ad.dispose();
+          onAdFailedToLoad?.call(ad, error);
+        },
+        onAdOpened: (ad) {
+          Logger.i('Banner ad opened');
+        },
+        onAdClosed: (ad) {
+          Logger.i('Banner ad closed');
+        },
+      ),
+    );
+  }
+  
+  // Helper to get test ad unit ID for banner
+  String get bannerAdUnitId => _bannerAdUnitId;
 }
