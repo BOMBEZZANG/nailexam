@@ -72,7 +72,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
 
     _animationController.forward().then((_) {
       // Auto-hide after 2.5 seconds (longer for guide messages)
-      final duration = message.contains('문질러') || message.contains('꾹') 
+      final duration = message.contains('문질러') || message.contains('꾹눌러') || message.contains('꾹 눌러') || message.contains('탭하세요') || message.contains('칠해주세요') || message.contains('탭해서')
           ? const Duration(milliseconds: 4000) 
           : const Duration(milliseconds: 2500);
       _hideTimer = Timer(duration, () {
@@ -108,7 +108,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
       return const SizedBox.shrink();
     }
 
-    final isCentered = _currentMessage.contains('문질러') || _currentMessage.contains('꾹');
+    final isCentered = _currentMessage.contains('문질러') || _currentMessage.contains('꾹눌러') || _currentMessage.contains('꾹 눌러') || _currentMessage.contains('탭하세요') || _currentMessage.contains('칠해주세요') || _currentMessage.contains('탭해서');
     
     return Positioned(
       top: isCentered ? null : MediaQuery.of(context).padding.top + 10,

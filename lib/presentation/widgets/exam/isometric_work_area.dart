@@ -46,6 +46,8 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   int _currentStep = 1;
   Map<int, Set<int>> _stepProgress = {}; // step -> set of completed nail indices
   Map<int, double> _nailPolishRemovalProgress = {}; // nail index -> removal progress
+  Map<int, double> _nailFingerBowlProgress = {}; // nail index -> finger bowl progress
+  Map<int, double> _nailCuticlePushProgress = {}; // nail index -> cuticle push progress
   Map<int, Set<ToolType>> _stepRequiredTools = {
     1: {ToolType.handSanitizer}, // 손을(내손 -> 고객 손) 소독하세요
     2: {ToolType.remover, ToolType.cottonPad}, // 폴리쉬 제거(소지->약지)
@@ -213,20 +215,127 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
   }
   
   void _onNailFilingProgress(int nailIndex, double progress) {
+    print('DEBUG: Filing progress for nail $nailIndex: $progress, current step: $_currentStep');
     if (_currentStep != 3) return;
     if (_stepTargetNails[3]?.contains(nailIndex) != true) return;
     
     setState(() {
       // Update nail state when fully filed
       if (progress >= 1.0 && _nailStates[nailIndex].needsFiling) {
+        print('DEBUG: Nail $nailIndex filing completed, marking as done');
         _nailStates[nailIndex] = _nailStates[nailIndex].copyWith(
           needsFiling: false,
         );
         _stepProgress[_currentStep]?.add(nailIndex);
         
+        print('DEBUG: Step $_currentStep progress after filing: ${_stepProgress[_currentStep]}');
+        
         // Check if current step is completed
         if (_isStepCompleted(_currentStep)) {
+          print('DEBUG: Step $_currentStep completed! Advancing to next step');
           _advanceToNextStep();
+        } else {
+          print('DEBUG: Step $_currentStep not yet completed');
+        }
+      }
+    });
+  }
+  
+  void _onFingerBowlProgress(int nailIndex, double progress) {
+    print('DEBUG: Finger bowl progress for nail $nailIndex: $progress, current step: $_currentStep');
+    if (_currentStep != 5) return;
+    if (_stepTargetNails[5]?.contains(nailIndex) != true) return;
+    
+    setState(() {
+      _nailFingerBowlProgress[nailIndex] = progress;
+      
+      // Update nail state when fully soaked (3 seconds)
+      if (progress >= 1.0) {
+        print('DEBUG: Nail $nailIndex finger bowl soaking completed, marking as done');
+        _stepProgress[_currentStep]?.add(nailIndex);
+        
+        print('DEBUG: Step $_currentStep progress after soaking: ${_stepProgress[_currentStep]}');
+        
+        // Check if current step is completed
+        if (_isStepCompleted(_currentStep)) {
+          print('DEBUG: Step $_currentStep completed! Advancing to next step');
+          _advanceToNextStep();
+        } else {
+          print('DEBUG: Step $_currentStep not yet completed');
+        }
+      }
+    });
+  }
+  
+  void _onCuticlePushProgress(int nailIndex, double progress) {
+    print('DEBUG: Cuticle push progress for nail $nailIndex: $progress, current step: $_currentStep');
+    if (_currentStep != 7) return;
+    if (_stepTargetNails[7]?.contains(nailIndex) != true) return;
+    
+    setState(() {
+      _nailCuticlePushProgress[nailIndex] = progress;
+      
+      // Update nail state when fully pushed (upward swipes completed)
+      if (progress >= 1.0) {
+        print('DEBUG: Nail $nailIndex cuticle push completed, marking as done');
+        _stepProgress[_currentStep]?.add(nailIndex);
+        
+        print('DEBUG: Step $_currentStep progress after cuticle push: ${_stepProgress[_currentStep]}');
+        
+        // Check if current step is completed
+        if (_isStepCompleted(_currentStep)) {
+          print('DEBUG: Step $_currentStep completed! Advancing to next step');
+          _advanceToNextStep();
+        } else {
+          print('DEBUG: Step $_currentStep not yet completed');
+        }
+      }
+    });
+  }
+  
+  void _onCuticleTrimProgress(int nailIndex, double accuracy) {
+    print('DEBUG: Cuticle trim progress for nail $nailIndex: accuracy $accuracy, current step: $_currentStep');
+    if (_currentStep != 8) return;
+    if (_stepTargetNails[8]?.contains(nailIndex) != true) return;
+    
+    setState(() {
+      // Mark nail as completed with accuracy score
+      if (accuracy > 0.0) {
+        print('DEBUG: Nail $nailIndex cuticle trimming completed with accuracy: $accuracy');
+        _stepProgress[_currentStep]?.add(nailIndex);
+        
+        print('DEBUG: Step $_currentStep progress after cuticle trim: ${_stepProgress[_currentStep]}');
+        
+        // Check if current step is completed
+        if (_isStepCompleted(_currentStep)) {
+          print('DEBUG: Step $_currentStep completed! Advancing to next step');
+          _advanceToNextStep();
+        } else {
+          print('DEBUG: Step $_currentStep not yet completed');
+        }
+      }
+    });
+  }
+  
+  void _onColorApplicationProgress(int nailIndex, double quality) {
+    print('DEBUG: Color application progress for nail $nailIndex: quality $quality, current step: $_currentStep');
+    if (_currentStep != 11) return;
+    if (_stepTargetNails[11]?.contains(nailIndex) != true) return;
+    
+    setState(() {
+      // Mark nail as completed with quality score
+      if (quality > 0.0) {
+        print('DEBUG: Nail $nailIndex color application completed with quality: $quality');
+        _stepProgress[_currentStep]?.add(nailIndex);
+        
+        print('DEBUG: Step $_currentStep progress after color application: ${_stepProgress[_currentStep]}');
+        
+        // Check if current step is completed
+        if (_isStepCompleted(_currentStep)) {
+          print('DEBUG: Step $_currentStep completed! Advancing to next step');
+          _advanceToNextStep();
+        } else {
+          print('DEBUG: Step $_currentStep not yet completed');
         }
       }
     });
@@ -339,6 +448,16 @@ class IsometricWorkAreaState extends State<IsometricWorkArea>
                     onPolishRemovalProgress: _onPolishRemovalProgress,
                     isNailFilingMode: widget.isPracticeMode && _currentStep == 3,
                     onNailFilingProgress: _onNailFilingProgress,
+                    isFingerBowlMode: widget.isPracticeMode && _currentStep == 5,
+                    onFingerBowlProgress: _onFingerBowlProgress,
+                    isCuticlePushMode: widget.isPracticeMode && _currentStep == 7,
+                    onCuticlePushProgress: _onCuticlePushProgress,
+                    isCuticleTrimMode: widget.isPracticeMode && _currentStep == 8,
+                    onCuticleTrimProgress: _onCuticleTrimProgress,
+                    isColorApplicationMode: widget.isPracticeMode && _currentStep == 11,
+                    onColorApplicationProgress: _onColorApplicationProgress,
+                    currentTool: widget.currentTool,
+                    currentPolishColor: widget.currentPolishColor,
                   ),
                 ),
               ),

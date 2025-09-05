@@ -23,6 +23,8 @@ class NailPainter extends CustomPainter {
   final bool showGuides;
   final double polishOpacity;
   final double filingProgress;
+  final double cuticlePosition;
+  final double colorApplicationProgress;
   
   NailPainter({
     required this.nailState,
@@ -32,6 +34,8 @@ class NailPainter extends CustomPainter {
     this.showGuides = false,
     this.polishOpacity = 1.0,
     this.filingProgress = 0.0,
+    this.cuticlePosition = 0.0,
+    this.colorApplicationProgress = 0.0,
   });
 
   @override
@@ -140,7 +144,9 @@ class NailPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     
     final nailRect = _getNailRect(size, center);
-    final nailPath = _getNailPath(nailRect, nailShape);
+    // Use modified shape for nail bed to match the filing progress
+    final modifiedShape = _getModifiedNailShape(nailShape, filingProgress);
+    final nailPath = _getNailPath(nailRect, modifiedShape);
     
     canvas.drawPath(nailPath, nailBedPaint);
   }
@@ -181,27 +187,59 @@ class NailPainter extends CustomPainter {
   }
   
   void _drawCuticle(Canvas canvas, Size size, Offset center) {
+    // Only draw cuticle if it hasn't been completely pushed back
+    if (cuticlePosition >= 1.0) return;
+    
     final cuticlePaint = Paint()
-      ..color = const Color(0xFFE8A598)
+      ..color = const Color(0xFFE8A598).withOpacity(1.0 - cuticlePosition * 0.3)
       ..style = PaintingStyle.fill;
     
     final nailRect = _getNailRect(size, center);
     final cuticlePath = Path();
     
-    // Cuticle curve at nail base
-    cuticlePath.moveTo(nailRect.left, nailRect.bottom - 5);
+    // Animate cuticle position - move it back from nail base
+    final pushOffset = cuticlePosition * 15; // Push cuticles back by up to 15 pixels
+    final cuticleBottom = nailRect.bottom + pushOffset;
+    final cuticleHeight = 8 * (1.0 - cuticlePosition * 0.5); // Reduce cuticle height
+    
+    // Cuticle curve at nail base (animated position)
+    cuticlePath.moveTo(nailRect.left, cuticleBottom - 5);
     cuticlePath.quadraticBezierTo(
-      nailRect.center.dx, nailRect.bottom + 8,
-      nailRect.right, nailRect.bottom - 5,
+      nailRect.center.dx, cuticleBottom + cuticleHeight,
+      nailRect.right, cuticleBottom - 5,
     );
-    cuticlePath.lineTo(nailRect.right, nailRect.bottom);
+    cuticlePath.lineTo(nailRect.right, cuticleBottom);
     cuticlePath.quadraticBezierTo(
-      nailRect.center.dx, nailRect.bottom + 3,
-      nailRect.left, nailRect.bottom,
+      nailRect.center.dx, cuticleBottom + cuticleHeight * 0.4,
+      nailRect.left, cuticleBottom,
     );
     cuticlePath.close();
     
     canvas.drawPath(cuticlePath, cuticlePaint);
+    
+    // Draw pushed-back cuticle effect
+    if (cuticlePosition > 0) {
+      final pushedCuticlePaint = Paint()
+        ..color = const Color(0xFFD4B5A8).withOpacity(cuticlePosition * 0.6)
+        ..style = PaintingStyle.fill;
+      
+      final pushedCuticlePath = Path();
+      final pushedY = nailRect.bottom + pushOffset + 5;
+      
+      pushedCuticlePath.moveTo(nailRect.left + 5, pushedY);
+      pushedCuticlePath.quadraticBezierTo(
+        nailRect.center.dx, pushedY + 3,
+        nailRect.right - 5, pushedY,
+      );
+      pushedCuticlePath.lineTo(nailRect.right - 5, pushedY + 2);
+      pushedCuticlePath.quadraticBezierTo(
+        nailRect.center.dx, pushedY + 5,
+        nailRect.left + 5, pushedY + 2,
+      );
+      pushedCuticlePath.close();
+      
+      canvas.drawPath(pushedCuticlePath, pushedCuticlePaint);
+    }
   }
   
   void _drawLunula(Canvas canvas, Size size, Offset center) {
@@ -210,29 +248,47 @@ class NailPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     
     final nailRect = _getNailRect(size, center);
+    final modifiedShape = _getModifiedNailShape(nailShape, filingProgress);
     final lunulaPath = Path();
     
-    // Half-moon shape at nail base
-    final lunulaRect = Rect.fromLTWH(
-      nailRect.left + nailRect.width * 0.25,
-      nailRect.bottom - nailRect.height * 0.25,
-      nailRect.width * 0.5,
-      nailRect.height * 0.3,
-    );
+    // Adjust lunula shape based on nail filing progress
+    if (modifiedShape == NailShape.round && filingProgress >= 1.0) {
+      // For perfectly round nails, create a circular lunula
+      final lunulaRadius = nailRect.width * 0.15;
+      final lunulaCenter = Offset(
+        nailRect.center.dx,
+        nailRect.bottom - nailRect.height * 0.15,
+      );
+      final lunulaRect = Rect.fromCircle(center: lunulaCenter, radius: lunulaRadius);
+      lunulaPath.addOval(lunulaRect);
+    } else {
+      // Default half-moon shape for other shapes
+      final lunulaRect = Rect.fromLTWH(
+        nailRect.left + nailRect.width * 0.25,
+        nailRect.bottom - nailRect.height * 0.25,
+        nailRect.width * 0.5,
+        nailRect.height * 0.3,
+      );
+      lunulaPath.addArc(lunulaRect, 0, math.pi);
+    }
     
-    lunulaPath.addArc(lunulaRect, 0, math.pi);
     canvas.drawPath(lunulaPath, lunulaPaint);
   }
   
   void _drawPolish(Canvas canvas, Size size, Offset center) {
-    if (!nailState.hasPolish || polishOpacity <= 0) return;
+    // Check if we should show polish
+    final shouldShowPolish = nailState.hasPolish || colorApplicationProgress > 0;
+    if (!shouldShowPolish || polishOpacity <= 0) return;
     
     final polishPaint = Paint()
       ..color = nailState.polishColor.withOpacity(0.8 * polishOpacity)
       ..style = PaintingStyle.fill;
     
     final nailRect = _getNailRect(size, center);
-    final coverageHeight = nailRect.height * nailState.polishCoverage;
+    
+    // Use color application progress if in color application mode, otherwise use nail state coverage
+    final coverage = colorApplicationProgress > 0 ? colorApplicationProgress : nailState.polishCoverage;
+    final coverageHeight = nailRect.height * coverage;
     
     final polishRect = Rect.fromLTWH(
       nailRect.left,
@@ -241,7 +297,9 @@ class NailPainter extends CustomPainter {
       coverageHeight,
     );
     
-    final polishPath = _getNailPath(polishRect, nailShape);
+    // Use modified shape for polish to match the filing progress
+    final modifiedShape = _getModifiedNailShape(nailShape, filingProgress);
+    final polishPath = _getNailPath(polishRect, modifiedShape);
     canvas.drawPath(polishPath, polishPaint);
     
     // Add polish shine
@@ -277,7 +335,9 @@ class NailPainter extends CustomPainter {
       freeEdgeHeight,
     );
     
-    final freeEdgePath = _getNailPath(freeEdgeRect, nailShape);
+    // Use modified shape for free edge to match the filing progress
+    final modifiedShape = _getModifiedNailShape(nailShape, filingProgress);
+    final freeEdgePath = _getNailPath(freeEdgeRect, modifiedShape);
     canvas.drawPath(freeEdgePath, freeEdgePaint);
   }
   
@@ -288,7 +348,9 @@ class NailPainter extends CustomPainter {
       ..strokeWidth = 2.0;
     
     final nailRect = _getNailRect(size, center);
-    final nailPath = _getNailPath(nailRect, nailShape);
+    // Use modified shape for grooves to match the filing progress
+    final modifiedShape = _getModifiedNailShape(nailShape, filingProgress);
+    final nailPath = _getNailPath(nailRect, modifiedShape);
     
     canvas.drawPath(nailPath, groovePaint);
   }
@@ -383,28 +445,21 @@ class NailPainter extends CustomPainter {
            oldDelegate.scale != scale ||
            oldDelegate.showGuides != showGuides ||
            oldDelegate.polishOpacity != polishOpacity ||
-           oldDelegate.filingProgress != filingProgress;
+           oldDelegate.filingProgress != filingProgress ||
+           oldDelegate.cuticlePosition != cuticlePosition ||
+           oldDelegate.colorApplicationProgress != colorApplicationProgress;
   }
   
   NailShape _getModifiedNailShape(NailShape originalShape, double progress) {
-    // Special handling for thumb (square) nail - transform to circle when filed
-    if (originalShape == NailShape.square) {
-      if (progress < 0.3) {
-        return NailShape.square; // Start as square
-      } else if (progress < 0.7) {
-        return NailShape.squoval; // Semi-filed
-      } else {
-        return NailShape.round; // Final result: circle shape
-      }
-    }
-    
-    // For other nail shapes, gradually refine them
-    if (progress < 0.3) {
-      return originalShape; // Rough shape
-    } else if (progress < 0.7) {
-      return NailShape.squoval; // Semi-refined
+    // All nails start as squoval and transform based on filing progress
+    if (progress < 0.4) {
+      return NailShape.squoval; // Start as squoval (rough edges)
+    } else if (progress < 0.8) {
+      return NailShape.oval; // Semi-filed to oval (smoothing)
+    } else if (progress >= 1.0) {
+      return NailShape.round; // Complete filing: perfect circle
     } else {
-      return NailShape.oval; // Well-filed (oval for non-thumb nails)
+      return NailShape.oval; // Nearly complete but not perfect circle yet
     }
   }
   

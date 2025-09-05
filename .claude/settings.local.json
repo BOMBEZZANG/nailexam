@@ -12,7 +12,8 @@
       "Bash(flutter build:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(rg:*)"
     ],
     "deny": [],
     "ask": []

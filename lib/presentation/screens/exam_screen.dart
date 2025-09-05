@@ -1028,6 +1028,34 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       });
     }
     
+    // Show special guide for step 5 (finger bowl)
+    if (newStep == 5) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _feedbackController.showFeedback('손가락을 꾹눌러주세요');
+      });
+    }
+    
+    // Show special guide for step 7 (cuticle push)
+    if (newStep == 7) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _feedbackController.showFeedback('큐티클 부분을 꾹 눌러주세요');
+      });
+    }
+    
+    // Show special guide for step 8 (cuticle trim)
+    if (newStep == 8) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _feedbackController.showFeedback('큐티클 포인트를 정확히 탭하세요');
+      });
+    }
+    
+    // Show special guide for step 11 (color application)
+    if (newStep == 11) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _feedbackController.showFeedback('5번 탭해서 네일을 칠해주세요');
+      });
+    }
+    
     if (newStep > 11) {
       // All steps completed
       _showTutorialCompleteDialog();
