@@ -245,31 +245,39 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   }
 
   Widget _buildLandscapeLayout() {
-    return Row(
+    return Column(
       children: [
-        // 왼쪽 도구 섹션
-        Container(
-          width: 200,
-          color: Theme.of(context).cardColor,
-          child: Column(
+        Expanded(
+          child: Row(
             children: [
-              // 상단 정보 섹션
-              _buildTopInfoSection(),
-              const Divider(height: 1),
-              // 도구/컬러 토글
-              _buildToolToggleSection(),
-              const Divider(height: 1),
-              // 도구 트레이 또는 색상 팔레트
+              // 왼쪽 도구 섹션
+              Container(
+                width: 200,
+                color: Theme.of(context).cardColor,
+                child: Column(
+                  children: [
+                    // 상단 정보 섹션
+                    _buildTopInfoSection(),
+                    const Divider(height: 1),
+                    // 도구/컬러 토글
+                    _buildToolToggleSection(),
+                    const Divider(height: 1),
+                    // 도구 트레이 또는 색상 팔레트
+                    Expanded(
+                      child: _showColorPalette ? _buildColorPalette() : _buildToolTray(),
+                    ),
+                  ],
+                ),
+              ),
+              // 메인 작업 영역
               Expanded(
-                child: _showColorPalette ? _buildColorPalette() : _buildToolTray(),
+                child: _buildMainWorkArea(),
               ),
             ],
           ),
         ),
-        // 메인 작업 영역
-        Expanded(
-          child: _buildMainWorkArea(),
-        ),
+        // Banner ads section for landscape mode
+        _buildBannerAdsSection(),
       ],
     );
   }
@@ -411,20 +419,28 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   }
 
   Widget _buildBottomToolSection() {
-    return Container(
-      height: 150, // Fixed height for bottom section
-      color: Theme.of(context).cardColor,
-      child: Column(
-        children: [
-          // Tool/Color toggle buttons with exit/complete buttons
-          _buildPortraitToolToggleSection(),
-          const Divider(height: 1),
-          // Tool Tray or Color Palette
-          Expanded(
-            child: _showColorPalette ? _buildColorPalette() : _buildToolTray(),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Tool section
+        Container(
+          height: 150, // Fixed height for tool section
+          color: Theme.of(context).cardColor,
+          child: Column(
+            children: [
+              // Tool/Color toggle buttons with exit/complete buttons
+              _buildPortraitToolToggleSection(),
+              const Divider(height: 1),
+              // Tool Tray or Color Palette
+              Expanded(
+                child: _showColorPalette ? _buildColorPalette() : _buildToolTray(),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        // Banner ads section
+        _buildBannerAdsSection(),
+      ],
     );
   }
 
@@ -1032,6 +1048,50 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
           ],
         );
       },
+    );
+  }
+  
+  Widget _buildBannerAdsSection() {
+    return Container(
+      width: double.infinity,
+      height: 60, // Standard banner ad height
+      color: Colors.grey[100],
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.ads_click,
+                color: Colors.grey[400],
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Banner Advertisement',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
