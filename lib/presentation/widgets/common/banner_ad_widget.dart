@@ -45,48 +45,15 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isAdLoaded || _bannerAd == null) {
+      return const SizedBox.shrink();
+    }
+    
     return Container(
-      width: double.infinity,
-      height: 60, // Standard banner height
-      color: Colors.grey[100],
-      child: _isAdLoaded && _bannerAd != null
-          ? AdWidget(ad: _bannerAd!)
-          : Container(
-              margin: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.ads_click,
-                      color: Colors.grey[400],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Loading Advertisement...',
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      alignment: Alignment.center,
+      width: _bannerAd!.size.width.toDouble(),
+      height: _bannerAd!.size.height.toDouble(),
+      child: AdWidget(ad: _bannerAd!),
     );
   }
 }

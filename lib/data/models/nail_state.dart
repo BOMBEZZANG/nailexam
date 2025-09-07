@@ -170,10 +170,10 @@ class NailState {
   void _applyPolishBrush(Color color) {
     polishColor = color;
     hasPolish = true;
-    polishCoverage = min(1.0, polishCoverage + 0.25);
+    polishCoverage = min(1.0, polishCoverage + 0.2); // 20% per application (5 taps total)
     
     // Base coat should be applied first
-    if (!hasBaseCoat && polishCoverage <= 0.25) {
+    if (!hasBaseCoat && polishCoverage <= 0.2) {
       hasBaseCoat = true;
     }
   }

@@ -21,6 +21,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<double> _practiceButtonAnimation;
   late Animation<double> _examButtonAnimation;
   late Animation<double> _sparkleAnimation;
+  
+  // Navigation flag to prevent double navigation
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -82,6 +85,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Future.delayed(const Duration(milliseconds: 500), () {
       _buttonAnimationController.forward();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reset navigation flag when returning to this screen
+    _isNavigating = false;
   }
 
   @override
@@ -328,7 +338,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           scale: animation.value,
           child: GestureDetector(
             onTapDown: (_) => HapticFeedback.lightImpact(),
-            onTap: onTap,
             child: Container(
               width: width,
               height: height,
@@ -458,6 +467,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _startPractice() {
+    if (_isNavigating) return; // Prevent double navigation
+    
+    _isNavigating = true;
     HapticFeedback.mediumImpact();
     AppRouter.navigateTo(
       context,
@@ -595,21 +607,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _watchAdAndStartExam() {
     if (AdManager.instance.isRewardedAdAvailable) {
+      bool hasNavigated = false;
+      
       AdManager.instance.showRewardedAd(
         onAdShown: () {
           print('Rewarded ad shown');
         },
         onUserEarnedReward: () {
           print('User earned reward');
-          _navigateToExam();
+          if (!hasNavigated) {
+            hasNavigated = true;
+            _navigateToExam();
+          }
         },
         onAdDismissed: () {
           print('Rewarded ad dismissed');
-          _navigateToExam();
+          if (!hasNavigated) {
+            hasNavigated = true;
+            _navigateToExam();
+          }
         },
         onAdFailedToShow: () {
           print('Rewarded ad failed to show, proceeding to exam');
-          _navigateToExam();
+          if (!hasNavigated) {
+            hasNavigated = true;
+            _navigateToExam();
+          }
         },
       );
     } else {
@@ -619,6 +642,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _navigateToExam() {
+    if (_isNavigating) return; // Prevent double navigation
+    
+    _isNavigating = true;
     AppRouter.navigateTo(
       context,
       AppRouter.exam,

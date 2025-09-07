@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../../../data/models/nail_state.dart';
@@ -497,7 +498,7 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
                         viewType: ViewType.topDown,
                         scale: widget.scale,
                         showGuides: widget.isPracticeMode && widget.isSelected,
-                        polishOpacity: widget.nailState.hasPolish ? 1.0 - _polishRemovalProgress : 0.0,
+                        polishOpacity: _calculatePolishOpacity(),
                         filingProgress: _filingProgress,
                         cuticlePosition: _cuticlePosition,
                         colorApplicationProgress: _colorApplicationProgress,
@@ -1603,7 +1604,11 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
   void _initializeColorApplication() {
     if (!widget.isColorApplicationMode) return;
     
-    print('DEBUG: Initializing color application for nail ${widget.nailIndex}');
+    debugPrint('🎯 INITIALIZING COLOR APPLICATION:');
+    debugPrint('🎯 Nail: ${widget.nailIndex}');
+    debugPrint('🎯 Mode: ${widget.isPracticeMode ? "Practice" : "Exam"}');
+    debugPrint('🎯 Selected color: ${widget.currentPolishColor}');
+    debugPrint('🎯 Fallback color: ${Colors.red}');
     
     setState(() {
       _colorApplicationProgress = 0.0;
@@ -1619,15 +1624,33 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
   void _handleColorApplicationTap(Offset tapPosition, Size widgetSize) {
     if (_tapCount >= 5) return; // Already completed
     
+    // SUPER DETAILED COLOR DEBUG
+    print('🔍🔍🔍 COLOR APPLICATION TAP DEBUG 🔍🔍🔍');
+    print('Current widget.currentPolishColor: ${widget.currentPolishColor}');
+    print('Current nail state polish color BEFORE: ${widget.nailState.polishColor}');
+    print('Practice mode: ${widget.isPracticeMode}');
+    print('Tap count BEFORE: $_tapCount');
+    
     setState(() {
       _tapCount++;
       _colorApplicationProgress = _tapCount / 5.0; // 20%, 40%, 60%, 80%, 100%
       
       // Apply polish using the NailState's applyPolish method
       if (widget.currentPolishColor != null) {
+        print('✅ COLOR EXISTS: Applying ${widget.currentPolishColor}');
         // Apply 20% polish coverage (0.2) on each tap
         widget.nailState.applyPolish(widget.currentPolishColor!, 0.2);
-        print('DEBUG: Applied polish - Color: ${widget.currentPolishColor}, Coverage now: ${widget.nailState.polishCoverage}');
+        // Ensure hasPolish is true when we have coverage
+        if (widget.nailState.polishCoverage > 0) {
+          widget.nailState.hasPolish = true;
+        }
+        print('✅ AFTER APPLYING:');
+        print('  Final nail color: ${widget.nailState.polishColor}');
+        print('  Coverage: ${widget.nailState.polishCoverage}');
+        print('  HasPolish: ${widget.nailState.hasPolish}');
+      } else {
+        print('❌ NO COLOR: widget.currentPolishColor is NULL!');
+        print('❌ This means the color was not passed to the nail widget correctly');
       }
     });
     
@@ -1644,7 +1667,7 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
       // Trigger celebration and complete step
       _triggerCompletionCelebration();
       widget.onColorApplicationProgress?.call(widget.nailIndex, 1.0); // Perfect quality for simple tapping
-      print('DEBUG: Color application completed!');
+      print('DEBUG: Color application completed! Final nail state - hasPolish: ${widget.nailState.hasPolish}, coverage: ${widget.nailState.polishCoverage}, color: ${widget.nailState.polishColor}');
     }
   }
   
@@ -1691,6 +1714,22 @@ class _SingleNailWidgetState extends State<SingleNailWidget>
     return widget.currentTool != null && 
            widget.currentTool is Tool && 
            (widget.currentTool as Tool).type == ToolType.polishBrush;
+  }
+  
+  double _calculatePolishOpacity() {
+    // During polish removal, fade out the existing polish
+    if (widget.isPolishRemovalMode && _polishRemovalProgress > 0) {
+      return widget.nailState.hasPolish ? 1.0 - _polishRemovalProgress : 0.0;
+    }
+    
+    // During color application, show polish based on application progress
+    if (widget.isColorApplicationMode && _colorApplicationProgress > 0) {
+      print('DEBUG: Color application mode active - progress: $_colorApplicationProgress, opacity: $_colorApplicationProgress');
+      return _colorApplicationProgress; // 0.0 to 1.0 based on tap count
+    }
+    
+    // For all other cases, show polish if it exists
+    return widget.nailState.hasPolish ? 1.0 : 0.0;
   }
   
   

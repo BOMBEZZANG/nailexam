@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/models/exam_session.dart';
 import '../../data/models/tool.dart';
@@ -108,11 +110,27 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   int? _examScore;
   List<String>? _completedSteps;
   List<String>? _missedSteps;
+  
+  // Timer for updating live score
+  Timer? _scoreUpdateTimer;
 
   @override
   void initState() {
     super.initState();
+    print('========================================');
+    print('EXAM SCREEN INITIALIZED');
+    print('Practice mode: ${widget.isPracticeMode}');
+    print('========================================');
+    stderr.writeln('STDERR: EXAM SCREEN INITIALIZED - Practice: ${widget.isPracticeMode}');
     _presenter = ExamPresenter();
+    
+    // Start timer for updating live score in exam mode
+    if (!widget.isPracticeMode) {
+      _scoreUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _updateLiveScore();
+      });
+    }
+    
     // Force rebuild to ensure UI is properly updated for both modes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {});
@@ -137,6 +155,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   void dispose() {
     _presenter.dispose();
     _feedbackController.dispose();
+    _scoreUpdateTimer?.cancel();
     super.dispose();
   }
 
@@ -287,20 +306,24 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
     return Container(
       padding: const EdgeInsets.all(12),
       color: Theme.of(context).cardColor,
-      child: Row(
+      child: Column(
         children: [
-          // Period Info Card
-          Expanded(
-            flex: 2,
-            child: _buildPeriodInfoCard(),
+          Row(
+            children: [
+              // Period Info Card
+              Expanded(
+                flex: 2,
+                child: _buildPeriodInfoCard(),
+              ),
+              const SizedBox(width: 12),
+              // Score Display (exam mode only)
+              if (!widget.isPracticeMode)
+                Expanded(
+                  flex: 1,
+                  child: _buildScoreDisplay(),
+                ),
+            ],
           ),
-          const SizedBox(width: 12),
-          // Score Display (exam mode only)
-          if (!widget.isPracticeMode)
-            Expanded(
-              flex: 1,
-              child: _buildScoreDisplay(),
-            ),
         ],
       ),
     );
@@ -328,7 +351,7 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
               ),
               const SizedBox(width: 6),
               Text(
-                widget.isPracticeMode ? '연습모드' : '시험모드',
+                widget.isPracticeMode ? '연습모드:1과제-매니큐어' : '시험모드:30분/20점',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -401,10 +424,13 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
   }
 
   Widget _buildIsometricWorkArea() {
-    print(
-      'DEBUG: Building isometric work area for ${widget.isPracticeMode ? "Practice" : "Exam"} mode',
-    );
-
+    print('=== ISOMETRIC WORK AREA BUILD ===');
+    print('Mode: ${widget.isPracticeMode ? "Practice" : "Exam"}');
+    print('Selected color: $_selectedColor');
+    print('Selected tool: ${_selectedTool?.name}');
+    print('Show color palette: $_showColorPalette');
+    print('=====================================');
+    
     return IsometricWorkArea(
       key: _workAreaKey,
       onDragUpdate: _onDragUpdate,
@@ -687,9 +713,19 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       selectedTools: _selectedTools,
       highlightedTools: highlightedTools,
       onToolSelected: (tool) {
+        // Debug logging for tool selection (before state change)
+        bool wasAlreadySelected = _selectedTools.contains(tool);
+        bool isStep2Context = (widget.isPracticeMode && _currentTutorialStep == 2) || 
+                              (!widget.isPracticeMode && _isStep2ToolSelection(tool));
+        
+        if (!widget.isPracticeMode) {
+          print('DEBUG: Tool clicked: ${tool.name} (${tool.type})');
+          print('DEBUG: isStep2Context: $isStep2Context');
+          print('DEBUG: Tool was already selected: $wasAlreadySelected');
+        }
+        
         setState(() {
-          // Special handling for step 2 - allow multiple tool selection
-          if (widget.isPracticeMode && _currentTutorialStep == 2) {
+          if (isStep2Context) {
             // For step 2, allow selecting both remover and cotton pad
             if (_selectedTools.contains(tool)) {
               // If tool is already selected, deselect it
@@ -698,32 +734,61 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
                 _selectedTool = _selectedTools.isNotEmpty ? _selectedTools.first : null;
               }
             } else {
-              // Add tool to selection if it's required for step 2
+              // Only add step 2 tools (remover and cotton pad)
               if (tool.type == ToolType.remover || tool.type == ToolType.cottonPad) {
+                // If we're not in practice mode, also clear any existing non-step-2 tools first
+                if (!widget.isPracticeMode) {
+                  _selectedTools.removeWhere((t) => t.type != ToolType.remover && t.type != ToolType.cottonPad);
+                }
                 _selectedTools.add(tool);
                 _selectedTool = tool; // Set as primary selected tool
               }
             }
           } else {
             // For other steps, single tool selection
+            // If we're in exam mode and switching away from step 2 tools, clear all and select new tool
+            if (!widget.isPracticeMode && _selectedTools.any((t) => t.type == ToolType.remover || t.type == ToolType.cottonPad)) {
+              // Clear step 2 tools when selecting a different tool
+              _selectedTools.clear();
+            }
+            
             _selectedTool = tool;
             _selectedTools.clear();
             _selectedTools.add(tool);
           }
         });
         
+        // Debug logging for final result
+        if (!widget.isPracticeMode) {
+          print('DEBUG: Final selected tools: ${_selectedTools.map((t) => '${t.name}(${t.type})').join(', ')}');
+          print('DEBUG: Primary tool: ${_selectedTool?.name}');
+          print('DEBUG: ---');
+        }
+        
         // Provide haptic feedback
         HapticFeedback.lightImpact();
         
-        // Clear color selection when tool is selected
-        if (_selectedColor != null) {
+        // Clear color selection when non-polish-brush tool is selected
+        // Keep color selection when polish brush is selected for color application
+        print('=== TOOL SELECTED ===');
+        print('Tool: ${tool.name} (${tool.type})');
+        print('Current _selectedColor before: $_selectedColor');
+        debugPrint('TOOL_SELECTED_DEBUG: ${tool.name} with color $_selectedColor');
+        
+        if (_selectedColor != null && tool.type != ToolType.polishBrush) {
+          print('CLEARING color because tool is not polish brush');
+          debugPrint('CLEARING_COLOR_DEBUG: Tool is ${tool.type}, clearing color');
           setState(() {
             _selectedColor = null;
           });
+        } else if (_selectedColor != null && tool.type == ToolType.polishBrush) {
+          print('KEEPING color because tool is polish brush');
+          debugPrint('KEEPING_COLOR_DEBUG: Tool is polish brush, keeping color');
         }
         
-        // Removed tool selection feedback message
-        print('DEBUG: Tool selected: ${tool.name}');
+        print('Current _selectedColor after: $_selectedColor');
+        debugPrint('FINAL_COLOR_DEBUG: $_selectedColor');
+        print('======================');
       },
       isCompact: true, // Horizontal layout for bottom section
     );
@@ -740,8 +805,18 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
         // Provide haptic feedback
         HapticFeedback.lightImpact();
         
-        // Removed color selection feedback message
-        print('DEBUG: Color selected: ${color.toString()}');
+        // Color selection debug logging  
+        print('=== COLOR SELECTED ===');
+        print('Color: ${color.toString()}');
+        print('Practice mode: ${widget.isPracticeMode}');
+        print('_selectedColor is now: $_selectedColor');
+        print('========================');
+        
+        // Try alternative logging methods
+        debugPrint('DEBUG_COLOR_SELECTED: $_selectedColor');
+        if (kDebugMode) {
+          print('FLUTTER_DEBUG: Color selected - $color');
+        }
       },
       isCompact: true, // Horizontal layout for bottom section
     );
@@ -802,12 +877,8 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
     if (widget.isPracticeMode) {
       _showPracticeCompleteDialog();
     } else {
-      // For exam mode, trigger exam completion
-      _onExamCompleted({
-        'score': _examScore ?? 5,
-        'completedSteps': _completedSteps ?? ['기본 매니큐어 완료'],
-        'missedSteps': _missedSteps ?? [],
-      });
+      // For exam mode, trigger exam completion by calling the work area's completeExam method
+      _workAreaKey.currentState?.completeExam();
     }
   }
 
@@ -898,12 +969,11 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
-              // Restart exam
-              Navigator.pushReplacement(
+              // Restart exam using AppRouter
+              AppRouter.navigateAndReplace(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => ExamScreen(isPracticeMode: false),
-                ),
+                AppRouter.exam,
+                arguments: {'isPracticeMode': false},
               );
             },
             child: const Text('다시 시도'),
@@ -949,6 +1019,23 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
     // Load any saved progress for practice mode
     // This is where you'd load from local storage if implemented
     print('DEBUG: Loading saved progress...');
+  }
+  
+  void _updateLiveScore() {
+    if (!widget.isPracticeMode && _workAreaKey.currentState != null) {
+      final currentScore = _workAreaKey.currentState!.getCurrentScore();
+      if (_examScore != currentScore) {
+        setState(() {
+          _examScore = currentScore;
+        });
+      }
+    }
+  }
+  
+  // Check if we should allow multiple tool selection for step 2 in exam mode
+  bool _isStep2ToolSelection(Tool tool) {
+    // Only allow multi-selection for step 2 tools (remover and cotton pad)
+    return tool.type == ToolType.remover || tool.type == ToolType.cottonPad;
   }
 
   // ExamView interface implementations
@@ -1113,4 +1200,5 @@ class _ExamScreenState extends State<ExamScreen> implements ExamView {
       SnackBar(content: Text(message)),
     );
   }
+  
 }

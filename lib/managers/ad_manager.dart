@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+import 'dart:io';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../core/utils/logger.dart';
 
@@ -16,13 +17,35 @@ class AdManager {
   DateTime? _rewardedAdLoadTime;
   bool _isInitialized = false;
 
-  // Test Ad Unit IDs (for development)
-  static const String _appOpenAdUnitId =
+  // Production Ad Unit IDs - iOS
+  static const String _iosAppOpenAdUnitId =
+      'ca-app-pub-2598779635969436/1666123548';
+  static const String _iosRewardedAdUnitId =
+      'ca-app-pub-2598779635969436/5672531759';
+  static const String _iosInterstitialAdUnitId =
+      'ca-app-pub-2598779635969436/4184475678';
+  static const String _iosBannerAdUnitId =
+      'ca-app-pub-2598779635969436/3565243160';
+
+  // Test Ad Unit IDs - for development and Android (until Android production IDs are provided)
+  static const String _testAppOpenAdUnitId =
       'ca-app-pub-3940256099942544/9257395921';
-  static const String _rewardedAdUnitId =
+  static const String _testRewardedAdUnitId =
       'ca-app-pub-3940256099942544/5224354917';
-  static const String _bannerAdUnitId =
+  static const String _testBannerAdUnitId =
       'ca-app-pub-3940256099942544/2435281174';
+  static const String _testInterstitialAdUnitId =
+      'ca-app-pub-3940256099942544/4411468910';
+
+  // Platform-specific getters
+  static String get _appOpenAdUnitId =>
+      Platform.isIOS ? _iosAppOpenAdUnitId : _testAppOpenAdUnitId;
+  static String get _rewardedAdUnitId =>
+      Platform.isIOS ? _iosRewardedAdUnitId : _testRewardedAdUnitId;
+  static String get _bannerAdUnitId =>
+      Platform.isIOS ? _iosBannerAdUnitId : _testBannerAdUnitId;
+  static String get _interstitialAdUnitId =>
+      Platform.isIOS ? _iosInterstitialAdUnitId : _testInterstitialAdUnitId;
 
   Future<void> initialize() async {
     if (_isInitialized) {
@@ -33,9 +56,9 @@ class AdManager {
     try {
       Logger.i('Starting AdMob initialization...');
       
-      // Request configuration for test ads
+      // Configure test devices for debugging (can be removed for production release)
       final RequestConfiguration requestConfiguration = RequestConfiguration(
-        testDeviceIds: ['6F0BB9EE24AB32A40AFF36E6E62333D4'], // From logs
+        testDeviceIds: ['23188363bf574ddb85daa964a6ab437d'], // From your logs
       );
       MobileAds.instance.updateRequestConfiguration(requestConfiguration);
       
